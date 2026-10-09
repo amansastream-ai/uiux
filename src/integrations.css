@@ -1,0 +1,29 @@
+/* Integration and voice-preference controls added to the Sutura prototype. */
+.shop-connection-banner { min-height: 59px; display: flex; align-items: center; gap: 10px; margin: -6px 0 14px; padding: 10px 13px; border: 1px solid #e8e5f7; border-radius: 11px; background: linear-gradient(100deg, #fbfaff, #f7fcfb); }
+.shop-connection-icon { width: 30px; height: 30px; display: grid; place-items: center; flex: 0 0 auto; color: #7868d2; background: #eeecff; border-radius: 9px; }
+.shop-connection-banner > div { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.shop-connection-banner strong { color: #58637a; font-size: 9px; font-weight: 600; }
+.shop-connection-banner > div span { overflow: hidden; color: #929bab; text-overflow: ellipsis; white-space: nowrap; font-size: 8px; }
+.connection-status { flex: 0 0 auto; padding: 5px 7px; color: #9a7a53; background: #fff5e7; border-radius: 7px; font-size: 7px; font-weight: 700; }
+.connection-status.requested { color: #6a60b0; background: #eeecff; }
+.voice-setting-controls { display: flex; align-items: center; gap: 7px; flex: 0 0 auto; }
+.voice-test-button { min-height: 31px; white-space: nowrap; }
+.settings-text-input { width: 185px; min-height: 33px; padding: 0 9px; flex: 0 0 auto; color: #536077; background: #fff; border: 1px solid #e7e9f0; border-radius: 8px; outline: none; font-size: 8px; }
+.settings-text-input::placeholder { color: #a6aebb; }
+.settings-text-input:focus { border-color: #cfc8f4; box-shadow: 0 0 0 3px rgba(117,97,219,.07); }
+@media (max-width: 760px) {
+  .shop-connection-banner { align-items: flex-start; padding: 9px; }
+  .shop-connection-banner > div span { white-space: normal; }
+  .connection-status { margin-left: auto; }
+  .voice-setting-controls { max-width: 100%; }
+  .voice-setting-controls .compact-select { width: 115px; }
+  .settings-text-input { width: min(180px, 45vw); }
+}
+@media (max-width: 440px) {
+  .shop-connection-banner { flex-wrap: wrap; }
+  .shop-connection-banner > div { min-width: calc(100% - 50px); }
+  .connection-status { margin-left: 40px; }
+  .setting-row { align-items: flex-start; flex-wrap: wrap; padding: 11px 0; }
+  .voice-setting-controls { width: 100%; }
+  .settings-text-input { width: 100%; }
+}
