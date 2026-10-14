@@ -2,16 +2,22 @@
  * SunuÉcole — Tests de fumée de bout en bout (HTTP réel, base de démo).
  * Exécution : npm run smoke   (ou npm test, qui exécute tout server/tests/)
  *
- * Prérequis : base peuplée (npm run seed au premier démarrage est automatique).
+ * La base de démonstration est semée automatiquement si elle est vide : sur un
+ * clone neuf (ou en CI), les comptes de test n'existeraient pas encore et tous
+ * les scénarios d'authentification échoueraient.
  */
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import app from '../src/index.js';
+import db from '../src/db/index.js';
+import { seed } from '../src/db/seed.js';
 
 let server;
 let base;
 
 before(async () => {
+  if (!db.pluck('SELECT COUNT(*) FROM schools')) seed();
+
   await new Promise((resolve) => { server = app.listen(0, '127.0.0.1', resolve); });
   base = `http://127.0.0.1:${server.address().port}`;
 });
