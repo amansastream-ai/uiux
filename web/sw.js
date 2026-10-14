@@ -8,7 +8,7 @@
  *    locales et la file d'attente de synchronisation) ;
  *  - jamais de cache pour les mutations (POST/PATCH/DELETE).
  */
-const VERSION = 'sue-v2.1';
+const VERSION = 'sue-v2.2';
 // Caches nommés par version : toute mise à jour repart d'un cache propre et
 // l'ancienne coquille est supprimée à l'activation (aucun code périmé ne survit).
 const SHELL = `${VERSION}-shell`;
@@ -65,6 +65,14 @@ self.addEventListener('activate', (e) => {
       keys.filter((k) => !k.startsWith(VERSION)).map((k) => caches.delete(k))
     ))
       .then(() => self.clients.claim())
+      // Onglets « zombies » : un onglet resté ouvert depuis une ancienne version
+      // garde l'ancien code en mémoire (requêtes sans jeton → « Session expirée »).
+      // On force leur rechargement une seule fois, à l'activation de cette version :
+      // ils repartent alors sur l'index frais et les modules versionnés.
+      .then(() => self.clients.matchAll({ type: 'window' }))
+      .then((clients) => Promise.allSettled(
+        clients.map((c) => (c.navigate ? c.navigate(c.url) : Promise.resolve()))
+      ))
   );
 });
 

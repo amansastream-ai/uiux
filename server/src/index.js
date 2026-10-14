@@ -251,6 +251,11 @@ if (fs.existsSync(webDir)) {
   });
   app.get('/', (_req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
+    // Purge le cache HTTP du navigateur à distance : les entrées stockées sous
+    // l'ancienne règle « immutable » (fraîches pendant un an) sont ainsi évincées,
+    // sinon l'ancien bundle continuerait d'être exécuté sans jamais redemander
+    // le réseau (« Session expirée » après connexion réussie).
+    res.setHeader('Clear-Site-Data', '"cache"');
     res.type('html').send(renderIndex());
   });
   app.use(express.static(webDir, { etag: true, maxAge: 0, index: false, setHeaders: revalidate }));
@@ -258,6 +263,7 @@ if (fs.existsSync(webDir)) {
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api')) return next();
     res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Clear-Site-Data', '"cache"');
     res.type('html').send(renderIndex());
   });
 } else {

@@ -21,6 +21,11 @@ export const bus = new EventTarget();
 /* Lectures protégées : si le stockage est indisponible (iframe tierce, navigation
    privée), une exception ici tuerait TOUT le graphe de modules → splash figé. */
 let token = readStored(LS_TOKEN);
+/** Génération de session : incrémentée à chaque setToken. Une requête lancée
+ *  avec une session précédente (onglet zombie, connexion entre-temps) ne doit
+ *  JAMAIS pouvoir déclencher une fin de session globale ni effacer le jeton
+ *  courant : son 401 est ignoré silencieusement. */
+let sessionGen = 0;
 /**
  * Jeton de renouvellement. Le serveur le pose aussi dans un cookie httpOnly, mais
  * les cookies tiers sont bloqués dans certains contextes (iframe de prévisualisation,
@@ -35,6 +40,7 @@ export const isOnline = () => navigator.onLine !== false;
 
 export function setToken(t) {
   token = t || null;
+  sessionGen++;
   try {
     if (t) localStorage.setItem(LS_TOKEN, t);
     else { localStorage.removeItem(LS_TOKEN); setRefreshToken(null); }
@@ -156,6 +162,7 @@ async function raw(path, { method = 'GET', body, headers = {}, signal, cacheTtl 
     // Jeton relu au moment de l'appel (voir currentToken) : aucune requête
     // authentifiée ne part sans en-tête alors qu'une session valide existe.
     const token = currentToken();
+    const gen = sessionGen;
     let res;
     try {
       res = await doFetch(token);
@@ -170,7 +177,7 @@ async function raw(path, { method = 'GET', body, headers = {}, signal, cacheTtl 
     }
 
     // Jeton expiré → tentative de renouvellement unique, puis rejeu.
-    if (res.status === 401 && !noAuth && token && !path.startsWith('/auth/')) {
+    if (res.status === 401 && !noAuth && token && gen === sessionGen && !path.startsWith('/auth/')) {
       if (!refreshing) {
         refreshing = fetch(`${API_BASE}/auth/refresh`, {
           method: 'POST',
@@ -205,7 +212,7 @@ async function raw(path, { method = 'GET', body, headers = {}, signal, cacheTtl 
       err.conflicts = payload?.conflicts;
       // Un 401 sur une route publique (connexion, inscription, mot de passe oublié)
       // est traité par le formulaire : il ne doit pas déclencher la fin de session globale.
-      if (res.status === 401 && token) { setToken(null); bus.dispatchEvent(new CustomEvent('unauthorized')); }
+      if (res.status === 401 && token && gen === sessionGen) { setToken(null); bus.dispatchEvent(new CustomEvent('unauthorized')); }
       throw err;
     }
     if (method === 'GET' && cacheTtl) memCache.set(key, { data: payload, at: Date.now() });
