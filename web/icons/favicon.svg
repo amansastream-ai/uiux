@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="SunuÉcole">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#12a184"/>
+      <stop offset="0.55" stop-color="#0e7c66"/>
+      <stop offset="1" stop-color="#0a4c3f"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <!-- Fond : carré arrondi, dégradé « vert baobab » -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect width="512" height="256" rx="112" fill="url(#shine)"/>
+  <!-- Tronc de baobab stylisé en filigrane -->
+  <g opacity="0.13" fill="#ffffff">
+    <path d="M232 452c0-52 6-84 6-108-14 10-30 16-46 18 18-16 34-36 44-58-22 6-44 4-64-6 24-4 46-16 62-34-16-4-30-12-42-24 40 4 76-14 98-46 4 22 14 42 30 58 14-26 34-48 58-64-10 30-12 62-6 92 16-14 36-24 56-28-24 16-44 38-58 62 22-2 44 2 64 12-30 6-58 20-80 40 14 20 22 44 22 68-14-22-34-40-58-52 2 34 0 56 0 90z"/>
+  </g>
+  <!-- Toque universitaire -->
+  <g fill="none" stroke="#ffffff" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M96 196 256 122l160 74-160 74z"/>
+    <path d="M152 232v84c0 26 46 48 104 48s104-22 104-48v-84"/>
+    <path d="M416 200v96"/>
+  </g>
+  <circle cx="416" cy="312" r="17" fill="#ffd166"/>
+</svg>

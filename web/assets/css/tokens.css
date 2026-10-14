@@ -1,0 +1,202 @@
+/* ============================================================================
+   SunuÉcole — Design tokens
+   Système de design complet : palette sémantique, échelle typographique,
+   espacements, élévations, rayons, animations. Thème clair + sombre.
+   Objectif : contraste AA partout, densité réglable, rendu net sur écran
+   de téléphone bas de gamme comme sur grand écran de direction.
+   ============================================================================ */
+
+:root {
+  /* --- Marque : vert "baobab" profond, chaud et institutionnel --- */
+  --brand-50:  #eef8f5;
+  --brand-100: #d6efe8;
+  --brand-200: #aedfd3;
+  --brand-300: #79c9b7;
+  --brand-400: #45ad97;
+  --brand-500: #1c9280;
+  --brand-600: #0e7c66;
+  --brand-700: #0b6252;
+  --brand-800: #0a4d41;
+  --brand-900: #083d34;
+
+  /* --- Accents terreux (terracotta, ambre, indigo) --- */
+  --accent-sand:    #d9a441;
+  --accent-clay:    #c1553a;
+  --accent-indigo:  #2f4b9b;
+  --accent-plum:    #7a3b6d;
+  --accent-ocean:   #1d6f8b;
+
+  /* --- Sémantique --- */
+  --ok:        #15803d;
+  --ok-bg:     #e8f6ed;
+  --warn:      #b45309;
+  --warn-bg:   #fdf3e2;
+  --danger:    #b91c1c;
+  --danger-bg: #fdeaea;
+  --info:      #1d4ed8;
+  --info-bg:   #e9efff;
+
+  /* --- Rayons --- */
+  --r-xs: 6px;
+  --r-sm: 9px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+  --r-full: 999px;
+
+  /* --- Espacements (échelle 4px) --- */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-7: 32px; --sp-8: 40px; --sp-9: 56px;
+
+  /* --- Typographie : pile système = 0 octet téléchargé, rendu natif --- */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+               "Helvetica Neue", "Noto Sans", Arial, sans-serif;
+  --font-display: "Segoe UI Semibold", ui-sans-serif, system-ui, -apple-system, Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --font-num: "SF Pro Display", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+
+  --fs-2xs: 11px; --fs-xs: 12px; --fs-sm: 13px; --fs-base: 14.5px;
+  --fs-md: 16px;  --fs-lg: 18px; --fs-xl: 21px;  --fs-2xl: 26px;
+  --fs-3xl: 32px; --fs-4xl: 42px;
+
+  --lh-tight: 1.18; --lh-snug: 1.35; --lh-normal: 1.55; --lh-relaxed: 1.7;
+
+  /* --- Transitions --- */
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+  --ease-in-out: cubic-bezier(.65, 0, .35, 1);
+  --t-fast: 120ms; --t-base: 200ms; --t-slow: 340ms;
+
+  /* --- Mise en page --- */
+  --sidebar-w: 264px;
+  --sidebar-w-collapsed: 74px;
+  --topbar-h: 62px;
+  --content-max: 1560px;
+
+  /* --- Focus visible : toujours net, jamais supprimé --- */
+  --ring: 0 0 0 3px color-mix(in srgb, var(--brand-500) 40%, transparent);
+}
+
+/* ========================= THÈME CLAIR ========================= */
+:root, [data-theme="light"] {
+  color-scheme: light;
+
+  --bg:            #f4f7f6;
+  --bg-subtle:     #eef2f1;
+  --bg-sunken:     #e7ecea;
+  --surface:       #ffffff;
+  --surface-2:     #fafbfb;
+  --surface-3:     #f3f6f5;
+  --surface-hover: #f0f5f3;
+
+  --border:        #dde5e2;
+  --border-strong: #c6d2ce;
+  --border-subtle: #eaeff0;
+
+  --text:          #10251f;
+  --text-2:        #3d564f;
+  --text-3:        #6b827b;
+  --text-inverse:  #ffffff;
+  --text-link:     var(--brand-700);
+
+  --shadow-xs: 0 1px 2px rgba(16, 37, 31, .05);
+  --shadow-sm: 0 1px 3px rgba(16, 37, 31, .07), 0 1px 2px rgba(16, 37, 31, .04);
+  --shadow-md: 0 4px 12px rgba(16, 37, 31, .08), 0 2px 4px rgba(16, 37, 31, .04);
+  --shadow-lg: 0 12px 32px rgba(16, 37, 31, .12), 0 4px 8px rgba(16, 37, 31, .05);
+  --shadow-xl: 0 24px 60px rgba(16, 37, 31, .18);
+
+  --sidebar-bg:      #0d2a24;
+  --sidebar-bg-2:    #0a211c;
+  --sidebar-text:    #b8d3cb;
+  --sidebar-text-2:  #7fa89e;
+  --sidebar-hover:   rgba(255, 255, 255, .07);
+  --sidebar-active:  rgba(28, 146, 128, .22);
+  --sidebar-border:  rgba(255, 255, 255, .08);
+
+  --scrim: rgba(8, 24, 20, .48);
+  --skeleton: linear-gradient(90deg, #e9eeee 25%, #f4f7f6 50%, #e9eeee 75%);
+}
+
+/* ========================= THÈME SOMBRE ========================= */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --brand-500: #2bb39a;
+  --brand-400: #3cc7ad;
+
+  --bg:            #0b1220;
+  --bg-subtle:     #0e1626;
+  --bg-sunken:     #070d18;
+  --surface:       #121c2e;
+  --surface-2:     #162134;
+  --surface-3:     #1b2739;
+  --surface-hover: #1e2c42;
+
+  --border:        #24334a;
+  --border-strong: #33455f;
+  --border-subtle: #1b2739;
+
+  --text:          #e8eef7;
+  --text-2:        #b3c2d6;
+  --text-3:        #8395ad;
+  --text-inverse:  #08111e;
+  --text-link:     #5fd8c0;
+
+  --ok:        #4ade80;   --ok-bg:     rgba(74, 222, 128, .13);
+  --warn:      #fbbf24;   --warn-bg:   rgba(251, 191, 36, .13);
+  --danger:    #f87171;   --danger-bg: rgba(248, 113, 113, .13);
+  --info:      #7aa2ff;   --info-bg:   rgba(122, 162, 255, .13);
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, .4);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, .5);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, .45);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, .55);
+  --shadow-xl: 0 28px 70px rgba(0, 0, 0, .65);
+
+  --sidebar-bg:      #08111e;
+  --sidebar-bg-2:    #060d18;
+  --sidebar-text:    #9fb3c9;
+  --sidebar-text-2:  #6b8098;
+  --sidebar-hover:   rgba(255, 255, 255, .06);
+  --sidebar-active:  rgba(43, 179, 154, .2);
+  --sidebar-border:  rgba(255, 255, 255, .07);
+
+  --scrim: rgba(0, 0, 0, .62);
+  --skeleton: linear-gradient(90deg, #162134 25%, #1e2c42 50%, #162134 75%);
+  --ring: 0 0 0 3px color-mix(in srgb, var(--brand-400) 45%, transparent);
+}
+
+/* ========================= DENSITÉ D'AFFICHAGE ========================= */
+/* « compact » gagne ~22 % de lignes à l'écran : précieux pour les secrétariats
+   qui traitent des centaines d'élèves. */
+[data-density="compact"] {
+  --row-h: 38px;
+  --cell-py: 5px;
+  --cell-px: 9px;
+  --fs-base: 13.5px;
+  --card-p: 14px;
+  --section-gap: 14px;
+  --topbar-h: 54px;
+}
+[data-density="confort"] {
+  --row-h: 48px;
+  --cell-py: 10px;
+  --cell-px: 14px;
+  --card-p: 20px;
+  --section-gap: 20px;
+}
+[data-density="spacieux"] {
+  --row-h: 56px;
+  --cell-py: 14px;
+  --cell-px: 18px;
+  --card-p: 24px;
+  --section-gap: 26px;
+}
+
+/* Variables non liées à la densité (valeurs par défaut) */
+:root {
+  --row-h: 48px;
+  --cell-py: 10px;
+  --cell-px: 14px;
+  --card-p: 20px;
+  --section-gap: 20px;
+}

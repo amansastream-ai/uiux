@@ -1,0 +1,49 @@
+# Dépendances
+node_modules/
+.pnp
+.pnp.js
+
+# Données locales (base SQLite, uploads, sauvegardes)
+server/data/*.sqlite
+server/data/*.db
+server/data/*.sqlite-journal
+server/data/*.sqlite-wal
+server/data/*.sqlite-shm
+server/data/uploads/
+server/data/backups/
+*.sqlite
+*.db
+
+# Build / cache
+dist/
+build/
+.vite/
+.cache/
+*.tsbuildinfo
+
+# Environnement & secrets
+.env
+.env.local
+.env.*.local
+config.local.json
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS / éditeurs
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*.swo
+
+# Couverture de tests
+coverage/
+.nyc_output/
