@@ -95,7 +95,12 @@ router.get('/', (req, res) => {
   });
   res.json({
     data: rows.map((r) => ({ ...r, solde: money(r.solde), tags: safeJson(r.tags_json) })),
-    meta: { total, page: Number(req.query.page) || 1, size: Number(req.query.limit) || 25 },
+    meta: {
+      total,
+      page: Number(req.query.page) || 1,
+      size: Number(req.query.limit) || 25,
+      pages: Math.max(1, Math.ceil(total / (Number(req.query.limit) || 25))),
+    },
     facets: facets(req.schoolId),
   });
 });

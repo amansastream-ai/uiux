@@ -15,6 +15,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import path from 'node:path';
 import fs from 'node:fs';
+import { pathToFileURL } from 'node:url';
 
 import { config, PLANS } from './config.js';
 import db from './db/index.js';
@@ -196,6 +197,36 @@ function renderIndex() {
   return raw.replace(/((?:href|src)="\/(?:assets|icons)\/[^"?]+)"/g, `$1?v=${BUILD_ID}"`);
 }
 
+/**
+ * Les imports ES relatifs ('./core/api.js') sont réécrits à la volée avec
+ * l'identifiant de build : chaque URL de module change à chaque déploiement.
+ * Sans cela, une copie stockée par le navigateur sous l'ancienne règle
+ * `immutable` (fraîche pendant un an) continue d'être servie et un module
+ * ancien casse tout le graphe (« does not provide an export named … »).
+ */
+const jsCache = new Map();
+app.get('/assets/js/*', (req, res, next) => {
+  const file = path.join(webDir, req.path);
+  if (!file.endsWith('.js')) return next();
+  let st;
+  try { st = fs.statSync(file); } catch { return next(); }
+  const key = `${file}:${BUILD_ID}`;
+  let entry = jsCache.get(key);
+  if (!entry) {
+    const src = fs.readFileSync(file, 'utf8');
+    entry = src.replace(
+      /(from\s*|import\(\s*)(['"])(\.{1,2}\/[^'"?]+\.js)\2/g,
+      (m, pre, q, spec) => `${pre}${q}${spec}?v=${BUILD_ID}${q}`
+    );
+    if (jsCache.size > 200) jsCache.clear();
+    jsCache.set(key, entry);
+  }
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('ETag', `W/"${BUILD_ID}-${st.mtimeMs.toString(36)}"`);
+  res.type('application/javascript; charset=UTF-8');
+  res.send(entry);
+});
+
 if (fs.existsSync(webDir)) {
   // Les assets ne sont pas fingerprintés : `no-cache` impose une revalidation par
   // ETag (304 quasi gratuit) au lieu d'un `immutable` d'un an qui fige le
@@ -264,7 +295,9 @@ function bootstrap() {
   }
 }
 
-const server = app.listen(config.port, config.host, () => {
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+let server = null;
+if (isMain) server = app.listen(config.port, config.host, () => {
   bootstrap();
   const lines = [
     '',
@@ -282,19 +315,21 @@ const server = app.listen(config.port, config.host, () => {
   console.log(lines.join('\n'));
 });
 
-server.keepAliveTimeout = 65000;
-server.headersTimeout = 66000;
+if (server) {
+  server.keepAliveTimeout = 65000;
+  server.headersTimeout = 66000;
 
-const shutdown = (signal) => {
-  console.log(`\n${signal} reçu → arrêt propre…`);
-  server.close(() => {
-    try { db.close(); } catch { /* ignore */ }
-    process.exit(0);
-  });
-  setTimeout(() => process.exit(1), 8000).unref();
-};
-process.on('SIGINT', () => shutdown('SIGINT'));
-process.on('SIGTERM', () => shutdown('SIGTERM'));
+  const shutdown = (signal) => {
+    console.log(`\n${signal} reçu → arrêt propre…`);
+    server.close(() => {
+      try { db.close(); } catch { /* ignore */ }
+      process.exit(0);
+    });
+    setTimeout(() => process.exit(1), 8000).unref();
+  };
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+}
 process.on('unhandledRejection', (reason) => console.error('[unhandledRejection]', reason));
 
 export default app;

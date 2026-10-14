@@ -200,3 +200,11 @@
   --card-p: 20px;
   --section-gap: 20px;
 }
+
+/* Alias de compatibilité : certaines règles historiques de bridge.css utilisent
+   ces noms ; ils pointent vers les jetons canoniques. */
+:root {
+  --fg-muted: var(--text-3);
+  --bg-panel: var(--surface);
+  --brand: var(--brand-600);
+}

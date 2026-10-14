@@ -174,17 +174,28 @@ export const db = {
     const target = new DatabaseSync(destFile);
     try {
       raw.exec('PRAGMA wal_checkpoint(FULL);');
-      for (const t of db.all("SELECT name, sql FROM sqlite_master WHERE type='table' AND sql IS NOT NULL")) {
+      // sqlite_sequence & co sont réservés : les recopier faisait échouer
+      // TOUTES les sauvegardes (npm run backup comme POST /api/settings/backups).
+      // foreign_keys=OFF : les tables peuvent être copiées dans n'importe quel
+      // ordre (sinon un INSERT vers une table référencée non encore créée échoue).
+      target.exec('PRAGMA foreign_keys=OFF;');
+      target.exec('BEGIN IMMEDIATE;');
+      const tables = db.all(
+        "SELECT name, sql FROM sqlite_master WHERE type='table' AND sql IS NOT NULL AND name NOT LIKE 'sqlite_%'"
+      );
+      for (const t of tables) {
         target.exec(t.sql);
         const cols = db.all(`PRAGMA table_info(${t.name})`).map((c) => c.name);
         const rows = db.all(`SELECT * FROM ${t.name}`);
         const ins = target.prepare(
           `INSERT INTO ${t.name} (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`
         );
-        target.exec('BEGIN');
         for (const r of rows) ins.run(...cols.map((c) => normalizeValue(r[c])));
-        target.exec('COMMIT');
       }
+      for (const ix of db.all("SELECT sql FROM sqlite_master WHERE type='index' AND sql IS NOT NULL")) {
+        try { target.exec(ix.sql); } catch { /* index implicite déjà présent */ }
+      }
+      target.exec('COMMIT;');
       return { file: destFile, size: fs.statSync(destFile).size };
     } finally {
       target.close();
