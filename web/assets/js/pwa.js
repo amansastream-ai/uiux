@@ -3,6 +3,9 @@
 (function () {
   if (!('serviceWorker' in navigator)) return;
   window.addEventListener('load', function () {
+    // Après une réparation automatique, on démarre une fois SANS service worker
+    // pour garantir un chargement neuf ; le verrou est levé au démarrage réussi.
+    try { if (sessionStorage.getItem('sue.noSW') === '1') return; } catch (e) { /* ignore */ }
     navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
       .then(function (reg) { reg.update(); return reg; })
       .catch(function () { /* non bloquant */ });

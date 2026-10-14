@@ -107,6 +107,15 @@ app.use('/api/auth/login', rateLimit({
 /* ------------------------------------------------------------------ */
 /* Routes API                                                          */
 /* ------------------------------------------------------------------ */
+/* Incidents côté client (ressource manquante, erreur JS, chien de garde).
+   Permet de diagnostiquer un navigateur réel sans devinettes. */
+app.post('/api/debug/client', express.json({ limit: '64kb' }), (req, res) => {
+  const line = `[client] ${JSON.stringify(req.body || {}).slice(0, 900)}`;
+  console.log(line);
+  if (logStream) logStream.write(`${new Date().toISOString()} ${line}\n`);
+  res.status(204).end();
+});
+
 app.get('/api/health', (_req, res) => {
   const t0 = Date.now();
   let dbOk = false;

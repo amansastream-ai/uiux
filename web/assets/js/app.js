@@ -700,7 +700,13 @@ function wireShell() {
 async function boot() {
   applyPrefs(getPrefs());
   const bootEl = document.getElementById('boot');
-  const finishBoot = () => { bootEl?.classList.add('done'); setTimeout(() => bootEl?.remove(), 320); };
+  const finishBoot = () => {
+    // Signale au chien de garde de boot-prefs.js que le démarrage a abouti :
+    // il annule la réparation automatique et lève le verrou « sans service worker ».
+    try { window.__sueBootOk && window.__sueBootOk(); } catch { /* ignore */ }
+    bootEl?.classList.add('done');
+    setTimeout(() => bootEl?.remove(), 320);
+  };
 
   // Enregistrement de toutes les routes
   registerDashboard(route);
@@ -772,10 +778,14 @@ async function boot() {
 
 boot().catch((err) => {
   console.error(err);
+  try { window.__sueReport && window.__sueReport({ kind: 'demarrage-impossible', message: String(err.message || err).slice(0, 220) }); } catch { /* ignore */ }
   document.getElementById('boot')?.remove();
   document.getElementById('app').hidden = false;
   document.getElementById('app').innerHTML = `<div style="padding:40px;text-align:center">
     <h1 style="font-size:20px">Démarrage impossible</h1>
     <p class="subtle mt-2">${esc(err.message)}</p>
-    <button class="btn btn-primary mt-4" onclick="location.reload()">Recharger</button></div>`;
+    <div class="row gap-2 mt-4" style="justify-content:center">
+      <button class="btn btn-primary" onclick="location.reload()">Recharger</button>
+      <button class="btn btn-secondary" onclick="window.__sueRepair ? window.__sueRepair(true) : location.reload()">Vider le cache et réparer</button>
+    </div></div>`;
 });

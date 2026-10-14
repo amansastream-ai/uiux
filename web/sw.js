@@ -112,7 +112,7 @@ self.addEventListener('fetch', (e) => {
   if (req.mode === 'navigate') {
     e.respondWith((async () => {
       try {
-        const res = await fetch(req, { cache: 'reload' });
+        const res = await fetch(req);
         if (res && res.ok) {
           const clone = res.clone();
           caches.open(SHELL).then((c) => c.put('/index.html', clone)).catch(() => {});
