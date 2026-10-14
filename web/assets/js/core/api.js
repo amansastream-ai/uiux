@@ -32,9 +32,11 @@ let refreshing = null;
 export const isOnline = () => navigator.onLine !== false;
 
 export function setToken(t) {
-  token = t;
-  if (t) localStorage.setItem(LS_TOKEN, t);
-  else { localStorage.removeItem(LS_TOKEN); setRefreshToken(null); }
+  token = t || null;
+  try {
+    if (t) localStorage.setItem(LS_TOKEN, t);
+    else { localStorage.removeItem(LS_TOKEN); setRefreshToken(null); }
+  } catch { /* stockage indisponible : la session reste valable en mémoire */ }
 }
 export const getToken = () => token;
 
@@ -46,6 +48,26 @@ export function setRefreshToken(t) {
   } catch { /* stockage indisponible */ }
 }
 export const getRefreshToken = () => refreshToken;
+
+/**
+ * Le jeton peut avoir été écrit par un autre onglet ou par une autre instance du
+ * module (mise à jour de l'application en cours de session). On relit le stockage
+ * à chaque requête et on écoute l'événement `storage` : plus aucun appel ne part
+ * sans en-tête Authorization alors qu'une session valide existe.
+ */
+function readStored(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function currentToken() {
+  if (token) return token;
+  const stored = readStored(LS_TOKEN);
+  if (stored) token = stored;
+  return token;
+}
+window.addEventListener('storage', (e) => {
+  if (e.key === LS_TOKEN) token = e.newValue || null;
+  if (e.key === LS_REFRESH) refreshToken = e.newValue || null;
+});
 
 /* ------------------------------------------------------------------ */
 /* Cache                                                               */
@@ -129,6 +151,9 @@ async function raw(path, { method = 'GET', body, headers = {}, signal, cacheTtl 
   };
 
   const promise = (async () => {
+    // Jeton relu au moment de l'appel (voir currentToken) : aucune requête
+    // authentifiée ne part sans en-tête alors qu'une session valide existe.
+    const token = currentToken();
     let res;
     try {
       res = await doFetch(token);

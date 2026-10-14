@@ -5,7 +5,7 @@
  * ce qui le concerne, ce qui réduit la charge cognitive et accélère l'adoption.
  */
 import { api, bus, getToken, setToken, setRefreshToken, getRefreshToken, clearCache, applyPrefs, getPrefs } from './core/api.js';
-import { store, route, startRouter, navigate, go, updatePrefs, cycleTheme, cycleDensity, toggleSidebar, currentPath, rerender } from './core/store.js';
+import { store, route, startRouter, stopRouter, navigate, go, updatePrefs, cycleTheme, cycleDensity, toggleSidebar, currentPath, rerender } from './core/store.js';
 import { icon } from './core/icons.js';
 import { h, esc, toast, toastOk, toastErr, openPalette, avatar, badge, emptyState, modal, drawer } from './ui/components.js';
 import { ROLES, relatif, num } from './core/format.js';
@@ -530,6 +530,7 @@ async function paletteItems(term) {
 /* ================================================================== */
 async function logout() {
   try { await api.post('/auth/logout'); } catch { /* ignore */ }
+  stopRouter();
   setToken(null);
   clearCache();
   store.set({ user: null, school: null });
@@ -584,14 +585,24 @@ function mountBootError(err) {
  * Toujours ramener l'utilisateur sur l'écran de connexion avec un message clair :
  * aucun écran ne doit rester bloqué sur « indisponible ».
  */
+let endingSession = false;
 function endSession(notice) {
-  setToken(null);
-  clearCache();
-  store.set({ user: null, school: null });
-  if (onAuthScreen()) return;
-  toast({ title: notice?.title || 'Session expirée', message: notice?.message || 'Merci de vous reconnecter.', tone: 'warn' });
-  navigate('/', { replace: true });
-  mountAuth(notice);
+  if (endingSession) return;
+  endingSession = true;
+  try {
+    // On arrête d'abord le routeur : plus aucune vue authentifiée ne peut être
+    // rendue (et donc échouer en 401) pendant que la session est nettoyée.
+    stopRouter();
+    setToken(null);
+    clearCache();
+    store.set({ user: null, school: null });
+    if (onAuthScreen()) return;
+    toast({ title: notice?.title || 'Session expirée', message: notice?.message || 'Merci de vous reconnecter.', tone: 'warn' });
+    // Le hash est conservé : après reconnexion, l'utilisateur retrouve sa page.
+    mountAuth(notice);
+  } finally {
+    setTimeout(() => { endingSession = false; }, 500);
+  }
 }
 
 let badgeTimer = null;

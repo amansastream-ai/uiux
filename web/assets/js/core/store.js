@@ -5,7 +5,7 @@
  * fichier directement, et survit aux proxies/prévisualisations sans
  * configuration de réécriture d'URL.
  */
-import { api, bus, getPrefs, setPrefs, applyPrefs } from './api.js';
+import { api, bus, getToken, getPrefs, setPrefs, applyPrefs } from './api.js';
 
 /* ------------------------------------------------------------------ */
 /* Store                                                               */
@@ -94,6 +94,8 @@ const routes = [];
 let notFound = null;
 let currentCleanup = null;
 let renderCount = 0;
+let routerStarted = false;
+let sessionGuardFired = false;
 
 export function route(pattern, handler, meta = {}) {
   // '/finance/factures/:id' → regex + noms de paramètres
@@ -132,6 +134,20 @@ function applyMeta(meta, params) {
 }
 
 async function render() {
+  /* Garde-fou de session.
+     Sans lui, un routeur encore vivant après une déconnexion (ou un onglet dont
+     le jeton a été effacé) rechargeait des vues authentifiées sans en-tête
+     Authorization : chaque appel revenait en 401 et l'écran restait bloqué sur
+     « Tableau de bord indisponible — Session expirée ». */
+  if (!getToken() && !store.state.user) {
+    if (!sessionGuardFired) {
+      sessionGuardFired = true;
+      bus.dispatchEvent(new CustomEvent('unauthorized', { detail: { raison: 'no-session' } }));
+    }
+    return;
+  }
+  sessionGuardFired = false;
+
   const path = currentPath();
   const query = currentQuery();
   const match = routes.find((r) => r.rx.test(path));
@@ -185,9 +201,29 @@ async function render() {
 }
 
 export function startRouter() {
-  window.addEventListener('hashchange', render);
+  // Idempotent : une reconnexion ne doit pas empiler un deuxième écouteur
+  // (chaque navigation déclenchait alors plusieurs rendus en parallèle).
+  if (!routerStarted) {
+    window.addEventListener('hashchange', render);
+    routerStarted = true;
+  }
+  sessionGuardFired = false;
   if (!location.hash) location.hash = '#/';
   render();
+}
+
+/** Arrête le routeur (déconnexion, fin de session) et libère la vue courante. */
+export function stopRouter() {
+  if (routerStarted) {
+    window.removeEventListener('hashchange', render);
+    routerStarted = false;
+  }
+  if (typeof currentCleanup === 'function') {
+    try { currentCleanup(); } catch { /* ignore */ }
+    currentCleanup = null;
+  }
+  sessionGuardFired = false;
+  renderCount = 0;
 }
 export const rerender = render;
 
