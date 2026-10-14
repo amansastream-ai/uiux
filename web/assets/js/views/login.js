@@ -4,7 +4,7 @@
  * Objectif d'adoption : une école doit pouvoir tester en moins de 10 secondes.
  * D'où les comptes de démonstration en un clic, pré-remplis par rôle.
  */
-import { api, setToken, isOnline } from '../core/api.js';
+import { api, setToken, setRefreshToken, isOnline } from '../core/api.js';
 import { icon } from '../core/icons.js';
 import { h, esc, toastErr, toastOk, modal } from '../ui/components.js';
 import { ROLES } from '../core/format.js';
@@ -19,7 +19,7 @@ const ROLE_ICONS = {
   super_admin: 'shield-check',
 };
 
-export function loginView({ onLoggedIn }) {
+export function loginView({ onLoggedIn, notice = null }) {
   let demo = null;
   let busy = false;
 
@@ -61,6 +61,13 @@ export function loginView({ onLoggedIn }) {
 
         <h2 style="font-size:23px;letter-spacing:-.02em;margin-bottom:5px">Connexion</h2>
         <p class="subtle" style="font-size:13.5px;margin-bottom:22px">Accédez à votre espace de gestion scolaire.</p>
+
+        ${notice ? `<div class="alert alert-warn mb-4" role="status">
+          ${icon('alert-circle', { size: 16 })}
+          <div class="alert-body">
+            <div class="alert-title">${esc(notice.title || 'Session expirée')}</div>
+            <div class="alert-msg">${esc(notice.message || 'Merci de vous reconnecter.')}</div>
+          </div></div>` : ''}
 
         <div id="offline-note" hidden></div>
 
@@ -141,6 +148,7 @@ export function loginView({ onLoggedIn }) {
         remember: root.querySelector('#lf-remember').checked,
       });
       setToken(res.token);
+      setRefreshToken(res.refreshToken);
       toastOk(`Bienvenue, ${res.user.firstName}`, `${res.user.roleLabel || ROLES[res.user.role]} · ${res.user.school?.name || ''}`);
       onLoggedIn();
     } catch (err) {
@@ -274,6 +282,7 @@ export function loginView({ onLoggedIn }) {
             close();
             if (r.token) {
               setToken(r.token);
+      setRefreshToken(r.refreshToken);
               onLoggedIn();
             } else {
               modal({
@@ -324,6 +333,7 @@ export function loginView({ onLoggedIn }) {
         try {
           const res = await api.post('/auth/login', { email: account.email, password: demo.password });
           setToken(res.token);
+      setRefreshToken(res.refreshToken);
           toastOk(`Bienvenue, ${res.user.firstName}`, `Démo ${res.user.roleLabel} · ${res.user.school?.name || 'Plateforme'}`);
           setTimeout(onLoggedIn, 260);
         } catch (err) {

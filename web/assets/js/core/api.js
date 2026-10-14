@@ -11,6 +11,7 @@
 
 const API_BASE = '/api';
 const LS_TOKEN = 'sue.token';
+const LS_REFRESH = 'sue.refresh';
 const LS_QUEUE = 'sue.syncQueue';
 const LS_PREFS = 'sue.prefs';
 
@@ -18,6 +19,12 @@ const LS_PREFS = 'sue.prefs';
 export const bus = new EventTarget();
 
 let token = localStorage.getItem(LS_TOKEN) || null;
+/**
+ * Jeton de renouvellement. Le serveur le pose aussi dans un cookie httpOnly, mais
+ * les cookies tiers sont bloqués dans certains contextes (iframe de prévisualisation,
+ * Safari/ITP) : ce double canal garantit une session qui se renouvelle toute seule.
+ */
+let refreshToken = localStorage.getItem(LS_REFRESH) || null;
 const inflight = new Map();
 const memCache = new Map();
 let refreshing = null;
@@ -27,9 +34,18 @@ export const isOnline = () => navigator.onLine !== false;
 export function setToken(t) {
   token = t;
   if (t) localStorage.setItem(LS_TOKEN, t);
-  else localStorage.removeItem(LS_TOKEN);
+  else { localStorage.removeItem(LS_TOKEN); setRefreshToken(null); }
 }
 export const getToken = () => token;
+
+export function setRefreshToken(t) {
+  refreshToken = t || null;
+  try {
+    if (t) localStorage.setItem(LS_REFRESH, t);
+    else localStorage.removeItem(LS_REFRESH);
+  } catch { /* stockage indisponible */ }
+}
+export const getRefreshToken = () => refreshToken;
 
 /* ------------------------------------------------------------------ */
 /* Cache                                                               */
@@ -129,9 +145,19 @@ async function raw(path, { method = 'GET', body, headers = {}, signal, cacheTtl 
     // Jeton expiré → tentative de renouvellement unique, puis rejeu.
     if (res.status === 401 && !noAuth && token && !path.startsWith('/auth/')) {
       if (!refreshing) {
-        refreshing = fetch(`${API_BASE}/auth/refresh`, { method: 'POST', credentials: 'include' })
+        refreshing = fetch(`${API_BASE}/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(refreshToken ? { refreshToken } : {}),
+        })
           .then((r) => (r.ok ? r.json() : Promise.reject(new Error('refresh'))))
-          .then((j) => { setToken(j.token); bus.dispatchEvent(new CustomEvent('user', { detail: j.user })); return j.token; })
+          .then((j) => {
+            if (j.refreshToken) setRefreshToken(j.refreshToken);
+            setToken(j.token);
+            bus.dispatchEvent(new CustomEvent('user', { detail: j.user }));
+            return j.token;
+          })
           .catch(() => { setToken(null); bus.dispatchEvent(new CustomEvent('unauthorized')); return null; })
           .finally(() => { refreshing = null; });
       }
@@ -150,7 +176,9 @@ async function raw(path, { method = 'GET', body, headers = {}, signal, cacheTtl 
       err.status = res.status;
       err.fields = payload?.fields;
       err.conflicts = payload?.conflicts;
-      if (res.status === 401) { setToken(null); bus.dispatchEvent(new CustomEvent('unauthorized')); }
+      // Un 401 sur une route publique (connexion, inscription, mot de passe oublié)
+      // est traité par le formulaire : il ne doit pas déclencher la fin de session globale.
+      if (res.status === 401 && token) { setToken(null); bus.dispatchEvent(new CustomEvent('unauthorized')); }
       throw err;
     }
     if (method === 'GET' && cacheTtl) memCache.set(key, { data: payload, at: Date.now() });

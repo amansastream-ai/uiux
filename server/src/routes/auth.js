@@ -10,7 +10,7 @@ import {
   authenticate, signAccessToken, signRefreshToken, hashRefresh,
   invalidateUser, loadSchool, audit,
 } from '../middleware/auth.js';
-import { addDays, today, HttpError } from '../lib/utils.js';
+import { HttpError } from '../lib/utils.js';
 import { onboardSchool, validateSignup, currentYearName } from '../lib/onboard.js';
 
 /** Table de secours pour la réinitialisation de mot de passe (créée si absente). */
@@ -27,13 +27,24 @@ db.exec(`CREATE TABLE IF NOT EXISTS password_resets (
 
 const router = Router();
 
-const cookieOpts = {
-  httpOnly: true,
-  sameSite: 'lax',
-  secure: config.auth.secureCookies,
-  maxAge: config.auth.refreshTokenTtlDays * 864e5,
-  path: '/api/auth',
-};
+/**
+ * Options du cookie de renouvellement, adaptées au contexte de la requête.
+ *
+ * En HTTPS (prévisualisation dans une iframe tierce, déploiement réel) le cookie
+ * doit être SameSite=None + Secure pour être renvoyé ; en HTTP local, SameSite=None
+ * est refusé par les navigateurs, on reste donc en Lax.
+ */
+function cookieOptsFor(req) {
+  const fwd = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim();
+  const secure = config.auth.secureCookies || !!req.secure || fwd === 'https';
+  return {
+    httpOnly: true,
+    sameSite: secure ? 'none' : 'lax',
+    secure,
+    maxAge: config.auth.refreshTokenTtlDays * 864e5,
+    path: '/api/auth',
+  };
+}
 
 /** Compteurs de tentatives par IP+email (protection anti force brute en mémoire). */
 const attempts = new Map();
@@ -123,11 +134,12 @@ router.post('/login', (req, res, next) => {
 
     const token = signAccessToken(user);
     const refreshToken = signRefreshToken(user, req.headers['user-agent'] || '', req.ip);
-    res.cookie(config.auth.cookieName, refreshToken, cookieOpts);
+    res.cookie(config.auth.cookieName, refreshToken, cookieOptsFor(req));
     audit(req, 'login', 'user', user.id, `Connexion de ${user.email}`, { role: user.role });
 
     res.json({
       token,
+      refreshToken,
       expiresIn: config.auth.accessTokenTtl,
       user: publicUser(user, school),
       demo: { password: 'Sunu2026!' },
@@ -156,8 +168,8 @@ router.post('/refresh', (req, res, next) => {
     db.run("UPDATE refresh_tokens SET revoked_at=datetime('now') WHERE id=?", [row.id]);
     const newToken = signAccessToken(user);
     const newRefresh = signRefreshToken(user, req.headers['user-agent'] || '', req.ip);
-    res.cookie(config.auth.cookieName, newRefresh, cookieOpts);
-    res.json({ token: newToken, user: publicUser(user, school) });
+    res.cookie(config.auth.cookieName, newRefresh, cookieOptsFor(req));
+    res.json({ token: newToken, refreshToken: newRefresh, user: publicUser(user, school) });
   } catch (err) { next(err); }
 });
 
@@ -167,7 +179,9 @@ router.post('/refresh', (req, res, next) => {
 router.post('/logout', (req, res) => {
   const token = req.cookies?.[config.auth.cookieName];
   if (token) db.run("UPDATE refresh_tokens SET revoked_at=datetime('now') WHERE token_hash=?", [hashRefresh(token)]);
-  res.clearCookie(config.auth.cookieName, cookieOpts);
+  const clearOpts = cookieOptsFor(req);
+  delete clearOpts.maxAge;
+  res.clearCookie(config.auth.cookieName, clearOpts);
   res.json({ ok: true });
 });
 
@@ -286,13 +300,14 @@ router.post('/register', (req, res, next) => {
     const u = db.get('SELECT * FROM users WHERE id=?', [created.userId]);
     const school = loadSchool(created.schoolId);
     const token = signAccessToken(u);
-    const rt = signRefreshToken(u);
-    db.run('INSERT INTO refresh_tokens (user_id, token_hash, device, ip, expires_at) VALUES (?,?,?,?,?)',
-      [u.id, hashRefresh(rt), req.headers['user-agent']?.slice(0, 120) || null, req.ip, addDays(today(), config.auth.refreshTokenTtlDays)]);
-    res.cookie(config.auth.cookieName, rt, cookieOpts);
+    // signRefreshToken() persiste déjà le jeton (hash) en base : un second INSERT
+    // ici violait la contrainte UNIQUE et faisait échouer toutes les inscriptions.
+    const rt = signRefreshToken(u, req.headers['user-agent']?.slice(0, 120) || '', req.ip);
+    res.cookie(config.auth.cookieName, rt, cookieOptsFor(req));
 
     res.status(201).json({
       token,
+      refreshToken: rt,
       user: publicUser(u, school),
       onboarding: '/parametres',
       message: `Bienvenue ! Votre école « ${school.name} » est prête. Importez vos élèves depuis Excel pour démarrer.`,

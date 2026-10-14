@@ -8,7 +8,7 @@
  *    locales et la file d'attente de synchronisation) ;
  *  - jamais de cache pour les mutations (POST/PATCH/DELETE).
  */
-const VERSION = 'sue-v1.4';
+const VERSION = 'sue-v1.5';
 const SHELL = 'shell';
 const DATA = 'data';
 const SHELL_URLS = [
@@ -54,7 +54,12 @@ self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then((keys) => Promise.all(
       keys.filter((k) => k !== SHELL && k !== DATA && !k.startsWith(VERSION)).map((k) => caches.delete(k))
-    )).then(() => self.clients.claim())
+    ))
+      // Purge des réponses d'authentification mises en cache par une version antérieure
+      .then(() => caches.open(DATA).then((c) => c.keys().then((keys) => Promise.all(
+        keys.filter((k) => new URL(k.url).pathname.startsWith('/api/auth/')).map((k) => c.delete(k))
+      ))))
+      .then(() => self.clients.claim())
   );
 });
 
@@ -63,6 +68,9 @@ self.addEventListener('message', (e) => {
 });
 
 const isApi = (url) => url.pathname.startsWith('/api/');
+/** L'authentification ne se met jamais en cache : un jeton ou un profil périmé
+ *  enfermerait l'utilisateur dans une session morte (« Session expirée »). */
+const isAuthApi = (url) => url.pathname.startsWith('/api/auth/');
 const isGet = (r) => r.method === 'GET';
 
 self.addEventListener('fetch', (e) => {
@@ -72,6 +80,9 @@ self.addEventListener('fetch', (e) => {
 
   // Mutations : réseau uniquement (jamais de cache d'écriture)
   if (!isGet(req)) return;
+
+  // Authentification : réseau uniquement, aucun repli sur le cache
+  if (isAuthApi(url)) return;
 
   // API : réseau d'abord, repli cache
   if (isApi(url)) {

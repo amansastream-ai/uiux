@@ -4,7 +4,7 @@
  * La navigation est construite selon le rôle : chaque utilisateur ne voit que
  * ce qui le concerne, ce qui réduit la charge cognitive et accélère l'adoption.
  */
-import { api, bus, getToken, setToken, clearCache, applyPrefs, getPrefs } from './core/api.js';
+import { api, bus, getToken, setToken, setRefreshToken, getRefreshToken, clearCache, applyPrefs, getPrefs } from './core/api.js';
 import { store, route, startRouter, navigate, go, updatePrefs, cycleTheme, cycleDensity, toggleSidebar, currentPath, rerender } from './core/store.js';
 import { icon } from './core/icons.js';
 import { h, esc, toast, toastOk, toastErr, openPalette, avatar, badge, emptyState, modal, drawer } from './ui/components.js';
@@ -538,12 +538,58 @@ async function logout() {
   toastInfo('À bientôt', 'Vous êtes déconnecté.');
 }
 
-function mountAuth() {
+function mountAuth(notice = null) {
   const app = document.getElementById('app');
   app.hidden = false;
   app.innerHTML = '';
-  app.appendChild(loginView({ onLoggedIn: mountApp }));
+  document.body.classList.remove('is-offline-shell');
+  app.appendChild(loginView({ onLoggedIn: mountApp, notice }));
 }
+
+/** Vrai si l'écran de connexion est déjà affiché (évite les remontages en boucle). */
+const onAuthScreen = () => !!document.querySelector('#app .auth-page');
+
+/**
+ * Le serveur ne répond pas au démarrage (redémarrage, coupure, proxy).
+ * On garde la session et on propose de réessayer : pas de déconnexion punitive.
+ */
+function mountBootError(err) {
+  const app = document.getElementById('app');
+  app.hidden = false;
+  app.innerHTML = `<div style="min-height:100vh;display:grid;place-items:center;padding:22px">
+    <div class="card" style="max-width:460px;width:100%">
+      <div class="card-body" style="padding:34px 26px;text-align:center">
+        <span class="empty-icon">${icon('wifi-off', { size: 30 })}</span>
+        <h1 class="h-page" style="margin:12px 0 6px">Serveur injoignable</h1>
+        <p class="subtle small" style="line-height:1.6">
+          SunuÉcole n’arrive pas à contacter son serveur pour le moment.
+          Votre session est conservée — réessayez dans quelques secondes.</p>
+        <p class="tiny subtle mt-3" style="word-break:break-word">${esc(err?.message || '')}</p>
+        <div class="row gap-2 mt-4" style="justify-content:center">
+          <button class="btn btn-primary" id="boot-retry">${icon('refresh', { size: 15 })} Réessayer</button>
+          <button class="btn btn-secondary" id="boot-relogin">${icon('log-in', { size: 15 })} Changer de compte</button>
+        </div>
+      </div></div></div>`;
+  app.querySelector('#boot-retry').addEventListener('click', () => location.reload());
+  app.querySelector('#boot-relogin').addEventListener('click', () => { setToken(null); clearCache(); mountAuth(); });
+}
+
+/**
+ * Fin de session (jeton expiré, invalide, base réinitialisée, révocation).
+ * Toujours ramener l'utilisateur sur l'écran de connexion avec un message clair :
+ * aucun écran ne doit rester bloqué sur « indisponible ».
+ */
+function endSession(notice) {
+  setToken(null);
+  clearCache();
+  store.set({ user: null, school: null });
+  if (onAuthScreen()) return;
+  toast({ title: notice?.title || 'Session expirée', message: notice?.message || 'Merci de vous reconnecter.', tone: 'warn' });
+  navigate('/', { replace: true });
+  mountAuth(notice);
+}
+
+let badgeTimer = null;
 
 function mountApp() {
   shell();
@@ -554,7 +600,8 @@ function mountApp() {
   loadBadges();
   if (!store.state.online) document.body.classList.add('is-offline');
   // Rafraîchissement périodique léger des compteurs (notifications, alertes)
-  setInterval(() => { if (document.visibilityState === 'visible') loadBadges(); }, 90000);
+  if (badgeTimer) clearInterval(badgeTimer);
+  badgeTimer = setInterval(() => { if (document.visibilityState === 'visible' && store.state.user) loadBadges(); }, 90000);
 }
 
 function wireShell() {
@@ -653,16 +700,26 @@ async function boot() {
   // 404
   route('*', () => h(`<div class="card">${emptyState({ icon: 'search', title: 'Page introuvable', message: `Aucune page ne correspond à « ${currentPath()} ».` })}<div class="row gap-2 mt-4" style="justify-content:center;padding-bottom:26px"><a class="btn btn-primary" href="#/">Retour au tableau de bord</a></div></div>`), { title: 'Page introuvable' });
 
-  bus.addEventListener('unauthorized', () => {
-    if (store.state.user) { toast({ title: 'Session expirée', message: 'Merci de vous reconnecter.', tone: 'warn' }); mountAuth(); }
+  bus.addEventListener('unauthorized', (e) => {
+    endSession(e.detail?.notice || {
+      title: 'Session expirée',
+      message: 'Votre session n’est plus valide. Reconnectez-vous : les comptes de démonstration ci-dessous fonctionnent toujours.',
+    });
   });
 
   if (!getToken()) {
     // Tentative de restauration silencieuse via le cookie de renouvellement
     try {
-      const r = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' });
+      const rt = getRefreshToken();
+      const r = await fetch('/api/auth/refresh', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rt ? { refreshToken: rt } : {}),
+      });
       if (r.ok) {
         const j = await r.json();
+        if (j.refreshToken) setRefreshToken(j.refreshToken);
         setToken(j.token);
         store.set({ user: j.user, school: j.user?.school || null, prefs: { ...getPrefs(), ...(j.user.preferences || {}) } });
       }
@@ -675,9 +732,21 @@ async function boot() {
       store.set({ user: me.user, school: me.user?.school || null, prefs: { ...getPrefs(), ...(me.user.preferences || {}) } });
       applyPrefs(store.state.prefs);
       mountApp();
-    } catch {
-      setToken(null);
-      mountAuth();
+    } catch (err) {
+      if (err && err.status === 401) {
+        // Jeton expiré ou invalide (ex. base de démonstration réinitialisée)
+        setToken(null);
+        clearCache();
+        store.set({ user: null, school: null });
+        mountAuth({
+          title: 'Reconnexion requise',
+          message: 'Votre session précédente n’est plus valide. Choisissez un compte de démonstration ci-dessous : tout est prêt.',
+        });
+      } else {
+        // Serveur injoignable : on conserve le jeton et on propose de réessayer,
+        // plutôt que de déconnecter un utilisateur en zone à connexion intermittente.
+        mountBootError(err);
+      }
     }
   } else {
     mountAuth();
