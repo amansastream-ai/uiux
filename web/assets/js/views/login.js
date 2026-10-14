@@ -108,12 +108,23 @@ export function loginView({ onLoggedIn, notice = null }) {
       <div class="auth-form-foot tiny subtle">
         <span>${icon('lock', { size: 12 })} Connexion chiffrée</span>
         <span>${icon('cloud-off', { size: 12 })} Fonctionne hors-ligne</span>
+        <button type="button" class="btn btn-link btn-sm" id="btn-reset-app" title="Vide le cache local et recharge l'application">
+          ${icon('refresh', { size: 12 })} Réinitialiser l'application</button>
         <span>© ${new Date().getFullYear()} SunuÉcole</span>
       </div>
     </div>
   </div>`);
 
   /* ---------------- Interactions ---------------- */
+  root.querySelector('#btn-reset-app')?.addEventListener('click', async () => {
+    if (typeof window.sunuecoleReset === 'function') {
+      await window.sunuecoleReset();
+    } else {
+      try { localStorage.clear(); } catch { /* stockage indisponible */ }
+      location.reload();
+    }
+  });
+
   const emailInput = root.querySelector('#lf-email');
   const passInput = root.querySelector('#lf-pass');
 

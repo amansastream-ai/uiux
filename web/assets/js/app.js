@@ -568,10 +568,15 @@ function mountBootError(err) {
         <div class="row gap-2 mt-4" style="justify-content:center">
           <button class="btn btn-primary" id="boot-retry">${icon('refresh', { size: 15 })} Réessayer</button>
           <button class="btn btn-secondary" id="boot-relogin">${icon('log-in', { size: 15 })} Changer de compte</button>
+          <button class="btn btn-link btn-sm" id="boot-reset">${icon('refresh', { size: 14 })} Vider le cache et redémarrer</button>
         </div>
       </div></div></div>`;
   app.querySelector('#boot-retry').addEventListener('click', () => location.reload());
   app.querySelector('#boot-relogin').addEventListener('click', () => { setToken(null); clearCache(); mountAuth(); });
+  app.querySelector('#boot-reset')?.addEventListener('click', async () => {
+    if (typeof window.sunuecoleReset === 'function') await window.sunuecoleReset();
+    else location.reload();
+  });
 }
 
 /**

@@ -63,6 +63,29 @@ app.use(express.json({ limit: '4mb' }));
 app.use(express.urlencoded({ extended: true, limit: '4mb' }));
 app.use(cookieParser());
 
+/* ------------------------------------------------------------------ */
+/* Journal des requêtes API                                            */
+/* ------------------------------------------------------------------ */
+/* Objectif : pouvoir diagnostiquer un déploiement réel sans devinettes.
+ * Tout est écrit dans server/data/api.log (ignoré par Git) ; seuls les échecs
+ * (4xx/5xx) et les requêtes d'authentification remontent dans la console. */
+const API_LOG = path.join(config.paths.data, 'api.log');
+let logStream = null;
+try { fs.mkdirSync(config.paths.data, { recursive: true }); logStream = fs.createWriteStream(API_LOG, { flags: 'a' }); } catch { /* disque en lecture seule */ }
+
+app.use('/api', (req, res, next) => {
+  const t0 = Date.now();
+  res.on('finish', () => {
+    const ms = Date.now() - t0;
+    const who = req.user ? ` user=${req.user.id}/${req.user.role}` : ' user=anonyme';
+    const auth = req.headers.authorization ? ' bearer=oui' : ' bearer=non';
+    const line = `${new Date().toISOString()} ${req.method} ${req.originalUrl} -> ${res.statusCode} ${ms}ms ip=${req.ip}${who}${auth}`;
+    if (logStream) logStream.write(line + '\n');
+    if (res.statusCode >= 400 || req.path.startsWith('/auth/')) console.log(line);
+  });
+  next();
+});
+
 // Limitation de débit globale (protège une petite machine locale)
 app.use('/api', rateLimit({
   windowMs: config.security.rateLimitWindowMs,
@@ -136,17 +159,44 @@ app.use('/api', (_req, res) => {
 /* Application web (statique + fallback SPA)                           */
 /* ------------------------------------------------------------------ */
 const webDir = config.paths.web;
-const ONE_YEAR = 31536000;
+
+/**
+ * Identifiant de compilation calculé à partir de la date de modification la plus
+ * récente des fichiers web/. Il est injecté dans les URL d'assets de index.html :
+ * toute modification du code change les URL, donc aucun navigateur ne peut rester
+ * bloqué sur une ancienne version (les fichiers ne sont pas fingerprintés).
+ */
+function buildId(dir) {
+  let max = 0;
+  const walk = (d) => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const full = path.join(d, e.name);
+      if (e.isDirectory()) walk(full);
+      else { try { const m = fs.statSync(full).mtimeMs; if (m > max) max = m; } catch { /* ignoré */ } }
+    }
+  };
+  try { walk(dir); } catch { /* dossier absent */ }
+  return Math.floor(max / 1000).toString(36) || '1';
+}
+const BUILD_ID = process.env.BUILD_ID || buildId(webDir);
+
+/** index.html servi de mémoire, avec les assets versionnés (?v=BUILD_ID). */
+function renderIndex() {
+  const raw = fs.readFileSync(path.join(webDir, 'index.html'), 'utf8');
+  return raw.replace(/((?:href|src)="\/(?:assets|icons)\/[^"?]+)"/g, `$1?v=${BUILD_ID}"`);
+}
 
 if (fs.existsSync(webDir)) {
-  // Assets versionnés : cache immutable pour un rechargement quasi instantané
+  // Les assets ne sont pas fingerprintés : `no-cache` impose une revalidation par
+  // ETag (304 quasi gratuit) au lieu d'un `immutable` d'un an qui fige le
+  // navigateur — et le service worker — sur une ancienne version du code.
+  const revalidate = (res) => res.setHeader('Cache-Control', 'no-cache');
   app.use('/assets', express.static(path.join(webDir, 'assets'), {
-    maxAge: ONE_YEAR,
-    immutable: true,
-    etag: true,
-    setHeaders: (res) => res.setHeader('Cache-Control', `public, max-age=${ONE_YEAR}, immutable`),
+    maxAge: 0, immutable: false, etag: true, lastModified: true, setHeaders: revalidate,
   }));
-  app.use('/icons', express.static(path.join(webDir, 'icons'), { maxAge: ONE_YEAR }));
+  app.use('/icons', express.static(path.join(webDir, 'icons'), {
+    maxAge: 0, etag: true, lastModified: true, setHeaders: revalidate,
+  }));
   // Le service worker doit toujours être revalidé (sinon les mises à jour bloquent)
   app.get('/sw.js', (_req, res) => {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -158,12 +208,16 @@ if (fs.existsSync(webDir)) {
     res.setHeader('Content-Type', 'application/manifest+json');
     res.sendFile(path.join(webDir, 'manifest.webmanifest'));
   });
-  app.use(express.static(webDir, { etag: true, maxAge: 300, index: false }));
-  // Fallback SPA
+  app.get('/', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-cache');
+    res.type('html').send(renderIndex());
+  });
+  app.use(express.static(webDir, { etag: true, maxAge: 0, index: false, setHeaders: revalidate }));
+  // Fallback SPA : toujours le HTML versionné, jamais mis en cache
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api')) return next();
     res.setHeader('Cache-Control', 'no-cache');
-    res.sendFile(path.join(webDir, 'index.html'));
+    res.type('html').send(renderIndex());
   });
 } else {
   app.get('*', (_req, res) => {
@@ -211,6 +265,7 @@ const server = app.listen(config.port, config.host, () => {
     `  ║  API       http://${config.host}:${config.port}/api`,
     `  ║  Base      ${config.db.file.replace(config.paths.root + '/', '')}`,
     `  ║  Mode      ${config.env} · SMS ${config.integrations.sms.mode} · Mobile Money ${config.integrations.mobileMoney.mode}`,
+    `  ║  Build     ${BUILD_ID} (assets revalidés, journal : server/data/api.log)`,
     '  ╚══════════════════════════════════════════════════════════════╝',
     '',
   ];

@@ -8,9 +8,11 @@
  *    locales et la file d'attente de synchronisation) ;
  *  - jamais de cache pour les mutations (POST/PATCH/DELETE).
  */
-const VERSION = 'sue-v1.5';
-const SHELL = 'shell';
-const DATA = 'data';
+const VERSION = 'sue-v2.1';
+// Caches nommés par version : toute mise à jour repart d'un cache propre et
+// l'ancienne coquille est supprimée à l'activation (aucun code périmé ne survit).
+const SHELL = `${VERSION}-shell`;
+const DATA = `${VERSION}-data`;
 const SHELL_URLS = [
   '/',
   '/index.html',
@@ -43,22 +45,25 @@ const SHELL_URLS = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(SHELL).then((c) => c.addAll(SHELL_URLS.map((u) => new Request(u, { cache: 'reload' }))))
-      .catch(() => {}) // une URL manquante ne doit pas faire échouer l'installation
-      .then(() => self.skipWaiting())
-  );
+  e.waitUntil((async () => {
+    const cache = await caches.open(SHELL);
+    // URL par URL : un fichier manquant ne bloque plus la mise à jour du reste
+    // (cache.addAll() est atomique et échouait en silence au moindre 404).
+    await Promise.allSettled(SHELL_URLS.map(async (u) => {
+      try {
+        const res = await fetch(u, { cache: 'reload' });
+        if (res && res.ok) await cache.put(u, res.clone());
+      } catch { /* hors ligne pendant l'installation : on réessaiera */ }
+    }));
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then((keys) => Promise.all(
-      keys.filter((k) => k !== SHELL && k !== DATA && !k.startsWith(VERSION)).map((k) => caches.delete(k))
+      keys.filter((k) => !k.startsWith(VERSION)).map((k) => caches.delete(k))
     ))
-      // Purge des réponses d'authentification mises en cache par une version antérieure
-      .then(() => caches.open(DATA).then((c) => c.keys().then((keys) => Promise.all(
-        keys.filter((k) => new URL(k.url).pathname.startsWith('/api/auth/')).map((k) => c.delete(k))
-      ))))
       .then(() => self.clients.claim())
   );
 });
@@ -101,20 +106,28 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Coquille : cache d'abord puis rafraîchissement silencieux
+  // Navigation : réseau d'abord, coquille en cache seulement hors ligne.
+  // Servir le HTML en cache d'abord figeait l'utilisateur sur une ancienne
+  // version de l'application (le HTML pointe vers les URL d'assets versionnées).
   if (req.mode === 'navigate') {
-    e.respondWith(
-      caches.match('/index.html').then((cached) => {
-        const network = fetch(req).then((res) => {
-          if (res && res.ok) {
-            const clone = res.clone();
-            caches.open(SHELL).then((c) => c.put('/index.html', clone)).catch(() => {});
-          }
-          return res;
-        }).catch(() => cached);
-        return cached || network;
-      })
-    );
+    e.respondWith((async () => {
+      try {
+        const res = await fetch(req, { cache: 'reload' });
+        if (res && res.ok) {
+          const clone = res.clone();
+          caches.open(SHELL).then((c) => c.put('/index.html', clone)).catch(() => {});
+        }
+        return res;
+      } catch {
+        const cached = await caches.match('/index.html');
+        return cached || new Response(
+          '<!doctype html><meta charset="utf-8"><title>SunuÉcole</title>' +
+          '<body style="font:15px system-ui;padding:40px;text-align:center">' +
+          '<h1>Hors connexion</h1><p>Reconnectez-vous au réseau puis rechargez la page.</p>',
+          { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+        );
+      }
+    })());
     return;
   }
 
