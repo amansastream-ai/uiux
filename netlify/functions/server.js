@@ -1,38 +1,56 @@
 /**
  * SunuÉcole sur Netlify — fonction serverless enveloppant l'application Express.
  *
- * Particularités de l'environnement Lambda/Netlify :
- *  - système de fichiers en lecture seule, sauf /tmp (éphémère) : la base
+ * FICHIER COMMONJS VOLONTAIRE : le runtime Lambda/Netlify chargeait un fichier
+ * ESM (.js avec imports statiques et top-level await) comme du CommonJS
+ * (« Cannot use import statement outside a module »). On écrit donc du CJS
+ * pur et on charge l'application ESM par import() dynamique à l'intérieur.
+ * Le package.json voisin fixe "type": "commonjs" pour lever toute ambiguïté.
+ *
+ * Particularités Lambda/Netlify :
+ *  - système de fichiers en lecture seule sauf /tmp (éphémère) : la base
  *    SQLite y est créée et semée au premier démarrage froid ;
- *  - le code est empaqueté (bundle) : les chemins sont donc surchargés par
- *    variables d'environnement (SUE_DATA_DIR, SUE_WEB_DIR, DB_FILE) ;
- *  - chaque déploiement réinitialise /tmp : Netlify convient pour une
- *    démonstration publique, pas pour des données de production
- *    (voir DEPLOIEMENT-NETLIFY.md pour Render/Railway/VPS).
+ *  - code empaqueté (bundle) : chemins surchargés par variables
+ *    (SUE_DATA_DIR, SUE_WEB_DIR, DB_FILE) ;
+ *  - /tmp réinitialisé à chaque déploiement : Netlify = démonstration
+ *    publique ; production = Render/Railway/VPS (DEPLOIEMENT-NETLIFY.md).
  */
-import { existsSync, mkdirSync } from 'node:fs';
-import path from 'node:path';
+'use strict';
 
-/* Les variables d'environnement doivent être posées AVANT l'import de config. */
-const DATA = process.env.SUE_DATA_DIR || '/tmp/sunuecole';
-mkdirSync(DATA, { recursive: true });
-process.env.SUE_DATA_DIR = DATA;
-if (!process.env.DB_FILE) process.env.DB_FILE = path.join(DATA, 'sunuecole.sqlite');
-if (!process.env.SUE_WEB_DIR) process.env.SUE_WEB_DIR = path.join(process.cwd(), 'web');
+const { existsSync, mkdirSync } = require('node:fs');
+const path = require('node:path');
 
-const { config } = await import('../../server/src/config.js');
+let _handler = null;
 
-/* Premier démarrage froid : base absente → semer les données de démonstration. */
-if (!existsSync(config.db.file)) {
-  const { seed } = await import('../../server/src/db/seed.js');
-  seed();
+async function loadHandler() {
+  if (_handler) return _handler;
+
+  /* Les variables d'environnement doivent être posées AVANT l'import de config. */
+  const DATA = process.env.SUE_DATA_DIR || '/tmp/sunuecole';
+  mkdirSync(DATA, { recursive: true });
+  process.env.SUE_DATA_DIR = DATA;
+  if (!process.env.DB_FILE) process.env.DB_FILE = path.join(DATA, 'sunuecole.sqlite');
+  if (!process.env.SUE_WEB_DIR) process.env.SUE_WEB_DIR = path.join(process.cwd(), 'web');
+
+  const { config } = await import('../../server/src/config.js');
+
+  /* Premier démarrage froid : base absente → semer les données de démonstration. */
+  if (!existsSync(config.db.file)) {
+    const { seed } = await import('../../server/src/db/seed.js');
+    seed();
+  }
+
+  const { default: app } = await import('../../server/src/index.js');
+  const serverless = (await import('serverless-http')).default;
+
+  _handler = serverless(app, {
+    binary: ['application/octet-stream', 'image/png', 'image/svg+xml'],
+  });
+  return _handler;
 }
 
-const { default: app } = await import('../../server/src/index.js');
-const serverless = (await import('serverless-http')).default;
-
-/** Adaptateur Express → API Gateway (Netlify Functions). */
-export const handler = serverless(app, {
-  // Les réponses binaires (exports, icônes) passent en base64 automatiquement.
-  binary: ['application/octet-stream', 'image/png', 'image/svg+xml'],
-});
+/** Point d'entrée API Gateway (Netlify Functions). */
+exports.handler = async (event, context) => {
+  const handler = await loadHandler();
+  return handler(event, context);
+};
