@@ -153,6 +153,16 @@ test('Listes paginées : shape {data, meta} + export CSV', async () => {
   assert.equal(buf[2], 0xbf, 'BOM octet 3');
 });
 
+test('Secours d’authentification : X-Session et cookie sue_at acceptés', async () => {
+  const { token } = await login('direction@lesbaobabs.sn');
+  const viaX = await fetch(`${base}/api/auth/me`, { headers: { 'X-Session': token } });
+  assert.equal(viaX.status, 200, 'en-tête X-Session');
+  const viaCookie = await fetch(`${base}/api/auth/me`, { headers: { Cookie: `sue_at=${token}` } });
+  assert.equal(viaCookie.status, 200, 'cookie sue_at');
+  const sans = await fetch(`${base}/api/auth/me`);
+  assert.equal(sans.status, 401, 'sans aucun canal');
+});
+
 test('Paramètres : plans d’abonnement et journal d’audit', async () => {
   const { token } = await login('direction@lesbaobabs.sn');
   const h = { Authorization: `Bearer ${token}` };

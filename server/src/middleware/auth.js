@@ -67,10 +67,26 @@ export function loadSchool(schoolId) {
 }
 export const invalidateSchoolCache = (id) => schoolCache.delete(Number(id));
 
+/**
+ * Le jeton d'accès voyage sur trois canaux : en-tête Authorization, en-tête
+ * X-Session, cookie sue_at. Certains proxys/relais (prévisualisations
+ * intégrées, CDN agressifs) suppriment l'en-tête Authorization : sans canal
+ * de secours, chaque requête arriverait anonyme (« Authentification
+ * requise » alors que la connexion a réussi). Le cookie est SameSite=Lax :
+ * jamais envoyé sur requête cross-site, donc pas de surface CSRF ajoutée.
+ */
+export const ACCESS_COOKIE = 'sue_at';
+export function extractAccessToken(req) {
+  const header = req.headers.authorization || '';
+  if (header.startsWith('Bearer ')) return header.slice(7);
+  const xs = req.headers['x-session'];
+  if (typeof xs === 'string' && xs.trim()) return xs.trim();
+  return req.cookies?.[ACCESS_COOKIE] || null;
+}
+
 /** Décode le Bearer token et attache req.user / req.school. */
 export function authenticate(req, _res, next) {
-  const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  const token = extractAccessToken(req);
   if (!token) return next(new HttpError(401, 'Authentification requise.'));
   try {
     const payload = jwt.verify(token, config.auth.jwtSecret);

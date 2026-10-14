@@ -36,10 +36,13 @@ export const config = {
 
   paths: {
     root: ROOT,
-    data: path.join(ROOT, 'server', 'data'),
-    uploads: path.join(ROOT, 'server', 'data', 'uploads'),
-    backups: path.join(ROOT, 'server', 'data', 'backups'),
-    web: path.join(ROOT, 'web'),
+    // Surchargeables par variables d'environnement : indispensable sur les
+    // hébergements sans disque persistant (Netlify/Lambda : /tmp) ou quand le
+    // code est empaqueté ailleurs que dans l'arborescence du dépôt.
+    data: process.env.SUE_DATA_DIR ? path.resolve(process.env.SUE_DATA_DIR) : path.join(ROOT, 'server', 'data'),
+    uploads: process.env.SUE_DATA_DIR ? path.join(path.resolve(process.env.SUE_DATA_DIR), 'uploads') : path.join(ROOT, 'server', 'data', 'uploads'),
+    backups: process.env.SUE_DATA_DIR ? path.join(path.resolve(process.env.SUE_DATA_DIR), 'backups') : path.join(ROOT, 'server', 'data', 'backups'),
+    web: process.env.SUE_WEB_DIR ? path.resolve(process.env.SUE_WEB_DIR) : path.join(ROOT, 'web'),
   },
 
   db: {

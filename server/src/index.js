@@ -79,7 +79,10 @@ app.use('/api', (req, res, next) => {
   res.on('finish', () => {
     const ms = Date.now() - t0;
     const who = req.user ? ` user=${req.user.id}/${req.user.role}` : ' user=anonyme';
-    const auth = req.headers.authorization ? ' bearer=oui' : ' bearer=non';
+    const canal = req.headers.authorization ? 'oui'
+      : req.headers['x-session'] ? 'x-session'
+      : req.cookies?.sue_at ? 'cookie' : 'non';
+    const auth = ` bearer=${canal}`;
     const line = `${new Date().toISOString()} ${req.method} ${req.originalUrl} -> ${res.statusCode} ${ms}ms ip=${req.ip}${who}${auth}`;
     if (logStream) logStream.write(line + '\n');
     if (res.statusCode >= 400 || req.path.startsWith('/auth/')) console.log(line);

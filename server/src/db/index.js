@@ -48,8 +48,21 @@ function ensureColumn(table, column, ddl) {
   }
 }
 
+/** Le schéma SQL : à côté du module, ou via SUE_SCHEMA_PATH, ou dans
+ *  l'arborescence du dépôt (bundles serverless où __dirname = le bundle). */
+function schemaPath() {
+  const cand = [
+    process.env.SUE_SCHEMA_PATH,
+    path.join(__dirname, 'schema.sql'),
+    path.join(process.cwd(), 'server', 'src', 'db', 'schema.sql'),
+    '/var/task/server/src/db/schema.sql',
+  ].filter(Boolean);
+  for (const c of cand) { try { if (fs.existsSync(c)) return c; } catch { /* ignoré */ } }
+  return cand[1] || cand[0];
+}
+
 function migrate() {
-  const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
+  const schema = fs.readFileSync(schemaPath(), 'utf8');
   raw.exec(schema);
   // Migrations légères et idempotentes pour les bases déjà existantes.
   ensureColumn('schools', 'demo', 'INTEGER NOT NULL DEFAULT 0');

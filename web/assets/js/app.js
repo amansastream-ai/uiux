@@ -7,7 +7,7 @@
 import { api, bus, getToken, setToken, setRefreshToken, getRefreshToken, clearCache, applyPrefs, getPrefs } from './core/api.js';
 import { store, route, startRouter, stopRouter, navigate, go, updatePrefs, cycleTheme, cycleDensity, toggleSidebar, currentPath, rerender } from './core/store.js';
 import { icon } from './core/icons.js';
-import { h, esc, toast, toastOk, toastErr, openPalette, avatar, badge, emptyState, modal, drawer } from './ui/components.js';
+import { h, esc, toast, toastOk, toastErr, toastInfo, openPalette, avatar, badge, emptyState, modal, drawer } from './ui/components.js';
 import { ROLES, relatif, num } from './core/format.js';
 
 import { loginView } from './views/login.js';

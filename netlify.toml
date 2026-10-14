@@ -1,0 +1,29 @@
+# SunuÉcole — configuration de déploiement Netlify.
+# L'application complète (API Express + front) tourne dans une fonction
+# serverless ; le dossier publish ne sert que de point d'entrée statique
+# de secours, toutes les routes étant proxyfiées vers la fonction.
+
+[build]
+  command = "npm install --no-audit --no-fund"
+  publish = "public"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+[functions."server"]
+  timeout = 30
+  included_files = [
+    "web/**",
+    "server/src/db/schema.sql"
+  ]
+
+# Toute requête (pages, assets, API) est traitée par l'application Express.
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/server"
+  status = 200
+  force = false

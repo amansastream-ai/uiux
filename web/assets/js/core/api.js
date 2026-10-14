@@ -38,9 +38,22 @@ let refreshing = null;
 
 export const isOnline = () => navigator.onLine !== false;
 
+/** Cookie de session (canal de secours si un relayeur perd Authorization). */
+function writeAccessCookie(t) {
+  try {
+    if (t) {
+      const sec = location.protocol === 'https:' ? '; Secure' : '';
+      document.cookie = `sue_at=${encodeURIComponent(t)}; path=/; max-age=7200; SameSite=Lax${sec}`;
+    } else {
+      document.cookie = 'sue_at=; path=/; max-age=0; SameSite=Lax';
+    }
+  } catch { /* contexte sans cookies */ }
+}
+
 export function setToken(t) {
   token = t || null;
   sessionGen++;
+  writeAccessCookie(t);
   try {
     if (t) localStorage.setItem(LS_TOKEN, t);
     else { localStorage.removeItem(LS_TOKEN); setRefreshToken(null); }
@@ -148,7 +161,8 @@ async function raw(path, { method = 'GET', body, headers = {}, signal, cacheTtl 
       method,
       headers: {
         ...(body ? { 'Content-Type': 'application/json' } : {}),
-        ...(useToken ? { Authorization: `Bearer ${useToken}` } : {}),
+        // Trois canaux : certains relais suppriment Authorization.
+        ...(useToken ? { Authorization: `Bearer ${useToken}`, 'X-Session': useToken } : {}),
         ...headers,
       },
       body: body ? JSON.stringify(body) : undefined,
@@ -244,7 +258,7 @@ export const api = {
 
   /** Téléchargement d'un fichier (export CSV, JSON) via blob. */
   async download(path, filename) {
-    const res = await fetch(API_BASE + path, { headers: token ? { Authorization: `Bearer ${token}` } : {}, credentials: 'include' });
+    const res = await fetch(API_BASE + path, { headers: token ? { Authorization: `Bearer ${token}`, 'X-Session': token } : {}, credentials: 'include' });
     if (!res.ok) throw new Error(`Export impossible (${res.status})`);
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
