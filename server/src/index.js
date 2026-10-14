@@ -109,8 +109,9 @@ app.use('/api/auth/login', rateLimit({
 /* ------------------------------------------------------------------ */
 /* Incidents côté client (ressource manquante, erreur JS, chien de garde).
    Permet de diagnostiquer un navigateur réel sans devinettes. */
-app.post('/api/debug/client', express.json({ limit: '64kb' }), (req, res) => {
-  const line = `[client] ${JSON.stringify(req.body || {}).slice(0, 900)}`;
+app.post('/api/debug/client', express.text({ type: ['application/json', 'text/plain'], limit: '64kb' }), (req, res) => {
+  const raw = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {});
+  const line = `[client] ${raw.slice(0, 900)}`;
   console.log(line);
   if (logStream) logStream.write(`${new Date().toISOString()} ${line}\n`);
   res.status(204).end();

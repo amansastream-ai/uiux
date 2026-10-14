@@ -275,8 +275,12 @@ async function parentNotes(el) {
       const hist = history.filter((x) => x.general_avg != null);
       if (hist.length > 1) {
         host.querySelector('#pn-line')?.appendChild(lineChart(
-          hist.map((x) => ({ label: x.trimestre || '', value: Number(x.general_avg) })),
-          { height: 160, color: '#0e7c66', yMax: 20 }
+          hist,
+          {
+            labels: hist.map((x) => x.trimestre || ''),
+            series: [{ name: 'Moyenne générale', data: hist.map((x) => Number(x.general_avg)), color: '#0e7c66', format: (v) => `${Number(v).toFixed(1)} / 20` }],
+            height: 160, yFormat: (v) => Number(v).toFixed(1),
+          }
         ));
       }
       host.querySelector('#pn-print')?.addEventListener('click', () => {
@@ -832,8 +836,12 @@ async function studentGrades(el) {
       </div>`;
     if (moyennes.length) {
       el.querySelector('#sg-bar')?.appendChild(barChart(
-        moyennes.map((m) => ({ label: m.matiere.slice(0, 12), value: Math.round(m.avg * 100) / 100 })),
-        { height: 200, yMax: 20, color: '#0e7c66' }
+        moyennes,
+        {
+          labels: moyennes.map((m) => m.matiere.slice(0, 12)),
+          series: [{ name: 'Moyenne', data: moyennes.map((m) => Math.round(m.avg * 100) / 100), color: '#0e7c66', format: (v) => `${v} / 20` }],
+          height: 200, yFormat: (v) => Number(v).toFixed(1),
+        }
       ));
     }
   } catch (err) {

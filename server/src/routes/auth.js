@@ -285,7 +285,7 @@ router.post('/register', (req, res, next) => {
         academicYear: b.academicYear || currentYearName(),
         headName: `${b.firstName} ${b.lastName}`,
         plan,
-        trialDays: config.plans?.trialDays || 15,
+        trialDays: config.platform?.trialDays || 15,
       });
       const userId = db.insert(
         `INSERT INTO users (school_id, role, first_name, last_name, email, phone, password_hash, avatar_color, gender, must_change_pw)

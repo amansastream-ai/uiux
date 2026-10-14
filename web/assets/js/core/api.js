@@ -18,13 +18,15 @@ const LS_PREFS = 'sue.prefs';
 /** Événement global : permet à l'UI de réagir à une déconnexion forcée. */
 export const bus = new EventTarget();
 
-let token = localStorage.getItem(LS_TOKEN) || null;
+/* Lectures protégées : si le stockage est indisponible (iframe tierce, navigation
+   privée), une exception ici tuerait TOUT le graphe de modules → splash figé. */
+let token = readStored(LS_TOKEN);
 /**
  * Jeton de renouvellement. Le serveur le pose aussi dans un cookie httpOnly, mais
  * les cookies tiers sont bloqués dans certains contextes (iframe de prévisualisation,
  * Safari/ITP) : ce double canal garantit une session qui se renouvelle toute seule.
  */
-let refreshToken = localStorage.getItem(LS_REFRESH) || null;
+let refreshToken = readStored(LS_REFRESH);
 const inflight = new Map();
 const memCache = new Map();
 let refreshing = null;

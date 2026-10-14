@@ -6,7 +6,7 @@
  * directeur voit sa structure d'écran en moins de 100 ms au lieu d'un écran
  * blanc pendant plusieurs secondes.
  */
-import { api } from '../core/api.js';
+import { api, setToken } from '../core/api.js';
 import { store, go } from '../core/store.js';
 import { icon } from '../core/icons.js';
 import { h, esc, badge, avatar, progress, emptyState, skeletonCards, dataTable, toastOk, toastErr, withBusy, debounce } from '../ui/components.js';
@@ -574,7 +574,7 @@ async function platformDashboard(el) {
       e.stopPropagation();
       try {
         const r2 = await api.post(`/settings/impersonate/${b.dataset.impersonate}`);
-        api.setTokenLocal?.(r2.token);
+        setToken(r2.token);
         location.reload();
       } catch (err) { toastErr('Accès impossible', err.message); }
     }));

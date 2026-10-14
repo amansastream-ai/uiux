@@ -990,9 +990,14 @@ async function canteenView(el, query = {}) {
              <span class="li-aside"><b class="num small">${num(x.n)}</b> repas</span></div>`).join('')}</div>`
         : emptyState({ icon: 'chart', title: 'Pas d’historique', message: 'Enregistrez vos premiers pointages pour voir la fréquentation.' });
       if ((d.historique || []).length) {
+        const cantineHist = d.historique.slice().reverse();
         el.querySelector('#ct-chart')?.appendChild(barChart(
-          d.historique.slice().reverse().map((x) => ({ label: dateFr(x.date).slice(0, 5), value: x.n })),
-          { height: 170, color: '#0e7c66' }
+          cantineHist,
+          {
+            labels: cantineHist.map((x) => dateFr(x.date).slice(0, 5)),
+            series: [{ name: 'Repas servis', data: cantineHist.map((x) => x.n), color: '#0e7c66' }],
+            height: 170,
+          }
         ));
       }
       paintTable();

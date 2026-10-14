@@ -24,8 +24,9 @@
           ? String(navigator.serviceWorker.controller.scriptURL).slice(-24) : 'aucun',
       };
       var body = JSON.stringify(Object.assign(base, data || {}));
-      if (navigator.sendBeacon) navigator.sendBeacon(REPORT, body);
-      else fetch(REPORT, { method: 'POST', body: body, keepalive: true });
+      var blob = new Blob([body], { type: 'application/json' });
+      if (navigator.sendBeacon) navigator.sendBeacon(REPORT, blob);
+      else fetch(REPORT, { method: 'POST', body: blob, keepalive: true });
     } catch (e) { /* jamais bloquant */ }
   }
   window.__sueReport = report;

@@ -47,3 +47,7 @@ Thumbs.db
 # Couverture de tests
 coverage/
 .nyc_output/
+
+# Secret JWT : jamais dans le dépôt (fourni par JWT_SECRET en production)
+server/data/.jwt_secret
+server/data/*.sqlite*
