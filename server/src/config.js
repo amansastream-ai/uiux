@@ -6,21 +6,46 @@
 import crypto from 'node:crypto';
 import path from 'node:path';
 import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { moduleDir } from './lib/paths.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+/* Répertoire du module : `null` lorsque le serveur est empaqueté en un seul
+ * fichier (fonction Netlify), `import.meta.url` étant alors vidé par esbuild. */
+const MODULE_DIR = moduleDir(import.meta.url);
+
 // server/src/config.js → deux niveaux remontent à la racine du projet.
-export const ROOT = path.resolve(__dirname, '..', '..');
+// Cas du bundle serverless : SUE_ROOT_DIR si fourni, sinon le répertoire de
+// travail — c'est la racine de la fonction (/var/task sur Netlify), où les
+// fichiers inclus (web/**, schema.sql) sont déployés.
+export const ROOT = process.env.SUE_ROOT_DIR
+  ? path.resolve(process.env.SUE_ROOT_DIR)
+  : (MODULE_DIR ? path.resolve(MODULE_DIR, '..', '..') : process.cwd());
 
-/** Génère (et persiste) un secret JWT stable si l'environnement n'en fournit pas. */
+/** Répertoire de données (base SQLite, envois, sauvegardes, journal).
+ *  SUE_DATA_DIR le déplace vers un disque inscriptible : indispensable en
+ *  serverless, où tout le code est en lecture seule (/tmp/sunuecole). */
+const DATA_DIR = process.env.SUE_DATA_DIR
+  ? path.resolve(process.env.SUE_DATA_DIR)
+  : path.join(ROOT, 'server', 'data');
+
+/** Génère (et persiste) un secret JWT stable si l'environnement n'en fournit pas.
+ *  Le fichier vit dans le répertoire de données — jamais dans l'arborescence du
+ *  code, en lecture seule une fois déployée en serverless — et un secret
+ *  éphémère est utilisé si même ce répertoire n'est pas inscriptible : mieux
+ *  vaut des sessions à redémarrer que cinq minutes d'indisponibilité. */
 function ensureSecret(file, envValue) {
   if (envValue) return envValue;
-  const p = path.join(ROOT, 'server', 'data', file);
-  fs.mkdirSync(path.dirname(p), { recursive: true });
-  if (fs.existsSync(p)) return fs.readFileSync(p, 'utf8').trim();
-  const secret = crypto.randomBytes(48).toString('hex');
-  fs.writeFileSync(p, secret, { mode: 0o600 });
-  return secret;
+  const p = path.join(DATA_DIR, file);
+  try {
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    if (fs.existsSync(p)) return fs.readFileSync(p, 'utf8').trim();
+    const secret = crypto.randomBytes(48).toString('hex');
+    fs.writeFileSync(p, secret, { mode: 0o600 });
+    return secret;
+  } catch {
+    console.warn(`[config] ${file} non inscriptible (disque en lecture seule) : `
+      + 'secret JWT éphémère — définissez JWT_SECRET pour des sessions durables.');
+    return crypto.randomBytes(48).toString('hex');
+  }
 }
 
 const bool = (v, d = false) => (v === undefined ? d : /^(1|true|yes|oui)$/i.test(String(v)));
@@ -39,9 +64,9 @@ export const config = {
     // Surchargeables par variables d'environnement : indispensable sur les
     // hébergements sans disque persistant (Netlify/Lambda : /tmp) ou quand le
     // code est empaqueté ailleurs que dans l'arborescence du dépôt.
-    data: process.env.SUE_DATA_DIR ? path.resolve(process.env.SUE_DATA_DIR) : path.join(ROOT, 'server', 'data'),
-    uploads: process.env.SUE_DATA_DIR ? path.join(path.resolve(process.env.SUE_DATA_DIR), 'uploads') : path.join(ROOT, 'server', 'data', 'uploads'),
-    backups: process.env.SUE_DATA_DIR ? path.join(path.resolve(process.env.SUE_DATA_DIR), 'backups') : path.join(ROOT, 'server', 'data', 'backups'),
+    data: DATA_DIR,
+    uploads: path.join(DATA_DIR, 'uploads'),
+    backups: path.join(DATA_DIR, 'backups'),
     web: process.env.SUE_WEB_DIR ? path.resolve(process.env.SUE_WEB_DIR) : path.join(ROOT, 'web'),
   },
 

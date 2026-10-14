@@ -9,13 +9,26 @@
  *   db.all(sql, params) / db.get(sql, params) / db.run(sql, params)
  *   db.tx(() => { ... })   → transaction avec rollback automatique
  */
-import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { config } from '../config.js';
+import { moduleDir } from '../lib/paths.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+/* `node:sqlite` n'existe QUE sous sa forme préfixée (le nom nu `sqlite` n'est
+ * pas un module Node). Or les bundleurs — dont esbuild, utilisé par Netlify —
+ * réécrivent les modules intégrés sans leur préfixe : le bundle contenait
+ * `require('sqlite')` et la fonction serverless échouait au démarrage
+ * (« Cannot find module 'sqlite' »). On résout donc le module à l'exécution :
+ * plus aucun littéral d'import à réécrire, y compris après empaquetage. */
+const sqlite = process.getBuiltinModule('node:sqlite');
+if (!sqlite) {
+  throw new Error('SunuÉcole requiert Node.js 22.5+ (module intégré node:sqlite introuvable).');
+}
+const { DatabaseSync } = sqlite;
+
+/* `null` quand le serveur tourne depuis un bundle (fonction serverless) : le
+ * schéma est alors cherché depuis le répertoire de travail, voir schemaPath(). */
+const MODULE_DIR = moduleDir(import.meta.url);
 
 fs.mkdirSync(path.dirname(config.db.file), { recursive: true });
 fs.mkdirSync(config.paths.uploads, { recursive: true });
@@ -53,7 +66,7 @@ function ensureColumn(table, column, ddl) {
 function schemaPath() {
   const cand = [
     process.env.SUE_SCHEMA_PATH,
-    path.join(__dirname, 'schema.sql'),
+    MODULE_DIR ? path.join(MODULE_DIR, 'schema.sql') : null,
     path.join(process.cwd(), 'server', 'src', 'db', 'schema.sql'),
     '/var/task/server/src/db/schema.sql',
   ].filter(Boolean);

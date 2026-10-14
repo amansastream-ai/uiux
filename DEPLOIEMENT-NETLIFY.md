@@ -62,6 +62,21 @@ Chaque `git push` sur `sunu-ecole` redéploie automatiquement.
 - le jeton de session voyage sur trois canaux (Authorization, X-Session,
   cookie `sue_at`) : compatible avec les proxies agressifs.
 
+### Dépannage — les deux pannes de bundling à connaître
+Le serveur est empaqueté par esbuild dans **un seul fichier CommonJS** : deux
+pièges en découlent, tous deux corrigés dans le dépôt. En cas de page
+« Invocation Failed », comparez le message à ce tableau.
+
+| Message dans la fonction | Cause | Correctif en place |
+|---|---|---|
+| `The "path" argument must be of type string… Received undefined`, au chargement de `server/src/config.js` | dans un bundle CJS, `import.meta` est vidé : `import.meta.url` vaut `undefined` et `fileURLToPath(undefined)` échoue | `server/src/lib/paths.js` (`moduleDir()`), repli `SUE_ROOT_DIR` puis répertoire de travail |
+| `Cannot find module 'sqlite'` | `node:sqlite` est un module **à préfixe obligatoire**, or le bundler réécrit `node:sqlite` en `require('sqlite')` | résolution à l'exécution : `process.getBuiltinModule('node:sqlite')` |
+| `EROFS: read-only file system` | écriture du secret JWT dans l'arborescence du code | le secret vit dans le répertoire de données (`/tmp/sunuecole`), sinon secret éphémère |
+
+Trois points de contrôle après chaque déploiement :
+`GET /api/health` → `{"status":"ok",…}` ; `GET /` → page de connexion ;
+les identifiants de démonstration du tableau ci-dessus fonctionnent.
+
 ### Limites assumées sur Netlify
 - données de démo **réinitialisées** à chaque déploiement / démarrage froid ;
 - plusieurs instances parallèles = bases séparées (cohérent pour une démo) ;
@@ -85,4 +100,5 @@ server/src/index.js --name sunuecole` + nginx en reverse proxy HTTPS.
 ## D. Vérifications après déploiement
 - `GET /api/health` → `{"status":"ok",…}` ;
 - page de connexion → comptes de démonstration → tableau de bord ;
-- `npm test` en local : 31 tests (unitaires + smoke HTTP) doivent rester verts.
+- `npm test` en local : 31 tests (unitaires + smoke HTTP) doivent rester verts —
+  sur un clone neuf, les tests sèment eux-mêmes la base de démonstration.
