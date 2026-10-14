@@ -17,7 +17,8 @@
     "reset": "node server/src/db/seed.js --fresh",
     "backup": "node server/src/lib/backup.js",
     "test": "node --test server/tests/unit.test.js server/tests/smoke.test.js",
-    "smoke": "node server/tests/smoke.test.js"
+    "smoke": "node server/tests/smoke.test.js",
+    "build": "node -e \"console.log('SunuÉcole : rien à compiler — Express est servi par la fonction serverless.')\""
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

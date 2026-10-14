@@ -22,8 +22,11 @@
   ]
 
 # Toute requête (pages, assets, API) est traitée par l'application Express.
+# force = true : sans cela, un fichier statique du dossier publish (par ex.
+# /index.html) prend le pas sur la réécriture et la fonction Express n'est
+# jamais appelée pour la racine → page « Redirection vers SunuÉcole ».
 [[redirects]]
   from = "/*"
   to = "/.netlify/functions/server"
   status = 200
-  force = false
+  force = true
