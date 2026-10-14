@@ -581,6 +581,21 @@ function mountBootError(err) {
 }
 
 /**
+ * Message de fin de session, adapté au contexte.
+ *
+ * Sur la démonstration Netlify, la base vit dans /tmp : elle est réinitialisée
+ * après une longue inactivité (conteneur recyclé). Le dire explicitement évite
+ * de laisser croire à une panne ou à un mot de passe erroné — un établissement
+ * créé pendant la démo ne survit pas à cette remise à zéro.
+ */
+function sessionEndedMessage() {
+  const isNetlifyDemo = /\.netlify\.app$/i.test(location.hostname);
+  return isNetlifyDemo
+    ? 'Votre session n’est plus valide : sur cette démonstration, les données sont réinitialisées après une période d’inactivité. Reconnectez-vous avec un compte de démonstration ci-dessous — pour des données durables, utilisez un hébergement avec disque persistant (voir DEPLOIEMENT-NETLIFY.md).'
+    : 'Votre session n’est plus valide. Reconnectez-vous pour continuer.';
+}
+
+/**
  * Fin de session (jeton expiré, invalide, base réinitialisée, révocation).
  * Toujours ramener l'utilisateur sur l'écran de connexion avec un message clair :
  * aucun écran ne doit rester bloqué sur « indisponible ».
@@ -725,7 +740,7 @@ async function boot() {
   bus.addEventListener('unauthorized', (e) => {
     endSession(e.detail?.notice || {
       title: 'Session expirée',
-      message: 'Votre session n’est plus valide. Reconnectez-vous : les comptes de démonstration ci-dessous fonctionnent toujours.',
+      message: sessionEndedMessage(),
     });
   });
 

@@ -191,7 +191,10 @@ async function raw(path, { method = 'GET', body, headers = {}, signal, cacheTtl 
     }
 
     // Jeton expiré → tentative de renouvellement unique, puis rejeu.
-    if (res.status === 401 && !noAuth && token && gen === sessionGen && !path.startsWith('/auth/')) {
+    // Toute route protégée y a droit, y compris /auth/me et /auth/password :
+    // auparavant le test portait sur tout préfixe « /auth/ », si bien qu'une
+    // session encore renouvelable était fermée d'office.
+    if (res.status === 401 && !noAuth && token && gen === sessionGen && !isPublicAuthRoute(path)) {
       if (!refreshing) {
         refreshing = fetch(`${API_BASE}/auth/refresh`, {
           method: 'POST',
@@ -225,8 +228,12 @@ async function raw(path, { method = 'GET', body, headers = {}, signal, cacheTtl 
       err.fields = payload?.fields;
       err.conflicts = payload?.conflicts;
       // Un 401 sur une route publique (connexion, inscription, mot de passe oublié)
-      // est traité par le formulaire : il ne doit pas déclencher la fin de session globale.
-      if (res.status === 401 && token && gen === sessionGen) { setToken(null); bus.dispatchEvent(new CustomEvent('unauthorized')); }
+      // est traité par le formulaire : il ne doit pas déclencher la fin de session
+      // globale ni effacer le jeton courant.
+      if (res.status === 401 && token && gen === sessionGen && !noAuth && !isPublicAuthRoute(path)) {
+        setToken(null);
+        bus.dispatchEvent(new CustomEvent('unauthorized'));
+      }
       throw err;
     }
     if (method === 'GET' && cacheTtl) memCache.set(key, { data: payload, at: Date.now() });
@@ -235,7 +242,10 @@ async function raw(path, { method = 'GET', body, headers = {}, signal, cacheTtl 
 
   if (method === 'GET') {
     inflight.set(key, promise);
-    promise.finally(() => inflight.delete(key));
+    // `finally` crée une promesse dérivée : sans ce `.catch`, l'échec de la
+    // requête remontait en « unhandled rejection » (bruit dans la console,
+    // remonté comme erreur applicative) en plus de l'erreur légitime de l'appelant.
+    promise.finally(() => inflight.delete(key)).catch(() => { /* déjà propagé à l'appelant */ });
   }
   return promise;
 }
@@ -245,6 +255,23 @@ function unauthorized() {
   err.status = 401;
   return err;
 }
+
+/**
+ * Routes d'authentification PUBLIQUES : un 401 y est une réponse métier
+ * (« identifiants incorrects ») et non la fin d'une session.
+ *
+ * Sans cette liste, soumettre un mot de passe erroné alors qu'un ancien jeton
+ * traînait dans le navigateur déclenchait la fin de session globale : l'écran
+ * affichait « Session expirée » au lieu de « Identifiants incorrects », et le
+ * jeton était effacé. C'est exactement ce qui rendait la connexion aux comptes
+ * de démonstration incompréhensible (mot de passe saisi ou pré-rempli par le
+ * navigateur légèrement différent → message de session expirée).
+ */
+const PUBLIC_AUTH_ROUTES = new Set([
+  '/auth/login', '/auth/register', '/auth/refresh',
+  '/auth/forgot-password', '/auth/reset-password', '/auth/demo-accounts',
+]);
+const isPublicAuthRoute = (path) => PUBLIC_AUTH_ROUTES.has(path.split('?')[0]);
 
 /* ------------------------------------------------------------------ */
 /* API publique                                                        */

@@ -4,7 +4,10 @@
 # de secours, toutes les routes étant proxyfiées vers la fonction.
 
 [build]
-  command = "npm install --no-audit --no-fund"
+  # build-secret.mjs : un secret de session unique pour tout le déploiement,
+  # sinon chaque instance de la fonction signe avec le sien et les jetons sont
+  # rejetés d'une requête à l'autre (« Session expirée »).
+  command = "node scripts/build-secret.mjs && npm install --no-audit --no-fund"
   publish = "public"
 
 [build.environment]
@@ -18,7 +21,8 @@
   timeout = 30
   included_files = [
     "web/**",
-    "server/src/db/schema.sql"
+    "server/src/db/schema.sql",
+    "server/data/.jwt_secret"
   ]
 
 # Toute requête (pages, assets, API) est traitée par l'application Express.
