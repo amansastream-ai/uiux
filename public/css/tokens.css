@@ -1,0 +1,139 @@
+/* ============================================================
+   ChronoRH — Design tokens (semantic layer)
+   Système de conception : primitives → sémantique → composants
+   ============================================================ */
+:root {
+  /* --- Primitives --- */
+  --navy-950: #071427;
+  --navy-900: #0B1F3A;
+  --navy-800: #122B4D;
+  --navy-700: #1B3B68;
+
+  --blue-700: #124FB0;
+  --blue-600: #1662DD;
+  --blue-500: #3E7DF0;
+  --blue-100: #E4EDFD;
+  --blue-50: #F0F5FF;
+
+  --gold-600: #C98A0B;
+  --gold-500: #E8A317;
+  --gold-100: #FBF0D4;
+
+  --violet-600: #6D4AE0;
+  --violet-100: #ECE7FD;
+
+  --green-700: #0B7A56;
+  --green-600: #0E9F6E;
+  --green-100: #DFF5EC;
+
+  --red-700: #B3261E;
+  --red-600: #D64545;
+  --red-100: #FBE5E5;
+
+  --orange-600: #D9711B;
+  --orange-100: #FCEBD9;
+
+  --gray-950: #0F1B2D;
+  --gray-800: #26364D;
+  --gray-700: #3C4F69;
+  --gray-600: #5B6B82;
+  --gray-500: #7A8AA0;
+  --gray-400: #A3B0C2;
+  --gray-300: #CDD7E3;
+  --gray-200: #E4EAF1;
+  --gray-100: #EEF2F7;
+  --gray-50: #F6F8FB;
+  --white: #FFFFFF;
+
+  /* --- Sémantique --- */
+  --color-bg: var(--gray-50);
+  --color-surface: var(--white);
+  --color-surface-2: var(--gray-100);
+  --color-ink: var(--gray-950);
+  --color-muted: var(--gray-600);
+  --color-faint: var(--gray-500);
+  --color-border: var(--gray-200);
+  --color-border-strong: var(--gray-300);
+
+  --color-primary: var(--blue-600);
+  --color-primary-hover: var(--blue-700);
+  --color-primary-soft: var(--blue-50);
+  --color-primary-ink: var(--blue-700);
+
+  --color-accent: var(--gold-500);
+  --color-accent-soft: var(--gold-100);
+
+  --color-night: var(--violet-600);
+  --color-night-soft: var(--violet-100);
+
+  --color-success: var(--green-600);
+  --color-success-soft: var(--green-100);
+  --color-danger: var(--red-600);
+  --color-danger-soft: var(--red-100);
+  --color-warning: var(--orange-600);
+  --color-warning-soft: var(--orange-100);
+
+  --color-sidebar: var(--navy-900);
+  --color-sidebar-ink: #C7D3E4;
+  --color-sidebar-active: rgba(255, 255, 255, 0.10);
+
+  /* --- Typographie --- */
+  --font-sans: "Inter", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-md: 0.9375rem;
+  --text-lg: 1.0625rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.375rem;
+  --text-5xl: 3.25rem;
+
+  /* --- Espacement (4px) --- */
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-3: 0.75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.25rem;
+  --sp-6: 1.5rem;
+  --sp-8: 2rem;
+  --sp-10: 2.5rem;
+  --sp-12: 3rem;
+  --sp-16: 4rem;
+
+  /* --- Rayons --- */
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 999px;
+
+  /* --- Ombres --- */
+  --shadow-xs: 0 1px 2px rgba(15, 27, 45, 0.05);
+  --shadow-sm: 0 1px 3px rgba(15, 27, 45, 0.08), 0 1px 2px rgba(15, 27, 45, 0.04);
+  --shadow-md: 0 4px 12px rgba(15, 27, 45, 0.08), 0 2px 4px rgba(15, 27, 45, 0.04);
+  --shadow-lg: 0 12px 32px rgba(15, 27, 45, 0.12), 0 4px 8px rgba(15, 27, 45, 0.06);
+  --shadow-xl: 0 24px 56px rgba(15, 27, 45, 0.18);
+  --shadow-focus: 0 0 0 3px rgba(22, 98, 221, 0.25);
+
+  /* --- Mouvements --- */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --dur-fast: 120ms;
+  --dur: 200ms;
+  --dur-slow: 320ms;
+
+  /* --- Layout --- */
+  --sidebar-w: 248px;
+  --topbar-h: 64px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
