@@ -26,7 +26,7 @@ export const ROLE_LABELS = {
   admin: 'Administrateur',
   drh: 'DRH',
   comptable: 'Comptable',
-  pointage: 'Gestion pointage'
+  pointage: 'Pointeur'
 };
 export const ROLE_COLORS = {
   admin: 'linear-gradient(135deg,#1662DD,#124FB0)',

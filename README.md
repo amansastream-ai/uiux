@@ -22,7 +22,12 @@ des **majorations** (nuit, dimanche/jour férié, heures supplémentaires) et de
 | 👑 **Administrateur** | Tout : utilisateurs, règles de paie, paramètres, journal d'audit |
 | 🧑‍💼 **DRH** | Employés, badges QR & empreintes, départements, pointages, rapports |
 | 💰 **Comptable** | Paie, bulletins, validations, paiements (Wave, virement…), export CSV |
-| ⏱️ **Gestion pointage** | Borne tablette, saisie/correction des pointages, registre du jour |
+| ⏱️ **Pointeur** | Borne tablette, saisie/correction des pointages, registre du jour |
+
+La page d’accès propose la connexion et la création d’un compte entreprise avec
+choix parmi ces quatre rôles. Les boutons **Autre compte** et **Sortir** restent
+accessibles dans l’application et sur la borne kiosque ; les quatre comptes de
+démonstration sont conservés.
 
 ### ⚖️ Moteur de paie (convention appliquée)
 
@@ -37,7 +42,7 @@ des **majorations** (nuit, dimanche/jour férié, heures supplémentaires) et de
 | Journée ≥ **10 h** ou comportant des heures de nuit | **panier compté** (1, 2, 3…) — jamais converti en FCFA |
 | Chaque **jour férié** non travaillé | payé **8 h** |
 
-- Taux horaire = salaire mensuel ÷ **173,33 h** (40 h × 52 ÷ 12)
+- Les heures supplémentaires (**+15 %**, **+40 %**) et majorations (nuit **+60 %**, dimanche/férié **+60 %**, nuit fériée **+100 %**) sont calculées directement sur le **salaire de base mensuel**, sur une base de **40 h/semaine**.
 - Cotisations salariales par défaut : **IPRES 5,6 %** + **CSS 5 %** (configurables)
 - Toutes les valeurs sont **paramétrables** dans *Paramètres → Règles de paie*,
   avec un **simulateur** en temps réel.
@@ -59,7 +64,7 @@ des **majorations** (nuit, dimanche/jour férié, heures supplémentaires) et de
 ```bash
 npm install
 npm start          # → http://localhost:3000
-npm test           # 22 tests : règles de paie + QR scannables + serverless Vercel
+npm test           # 24 tests : règles de paie + QR scannables + serverless Vercel
 ```
 
 Node.js ≥ 22 requis (SQLite natif `node:sqlite`, aucune compilation).
@@ -71,7 +76,7 @@ Node.js ≥ 22 requis (SQLite natif `node:sqlite`, aucune compilation).
 | Administrateur | `admin@sahelservices.sn` | `demo2026` |
 | DRH | `drh@sahelservices.sn` | `demo2026` |
 | Comptable | `compta@sahelservices.sn` | `demo2026` |
-| Gestion pointage | `pointage@sahelservices.sn` | `demo2026` |
+| Pointeur | `pointage@sahelservices.sn` | `demo2026` |
 
 Le jeu de démonstration contient **12 employés** (jour, nuit, rotation 7j/7),
 les pointages de **septembre & octobre 2026**, les **jours fériés du Sénégal**,
@@ -82,7 +87,7 @@ et un bordereau de paie de septembre validé avec paiements (Wave, virement).
 ## 📱 Installation sur tablette
 
 1. Ouvrir l'application dans le navigateur de la tablette
-2. Se connecter avec le compte *Gestion pointage*
+2. Se connecter avec le compte *Pointeur*
 3. Ouvrir **« Borne tablette »** (ou `#/borne`) et passer en plein écran (mode kiosque)
 4. Pour le QR : autoriser la caméra, brancher une douchette USB (mode saisie),
    ou imprimer les badges depuis *Employés → Badge QR → Imprimer*
@@ -99,7 +104,7 @@ Le dépôt est prêt pour un déploiement direct sur **Vercel** (aucune configur
    - Les fichiers statiques (`public/`) sont servis par le CDN Vercel
    - L'API Express (`/api/*`) est exécutée par la fonction serverless `api/index.js`
    - La base SQLite de démonstration est initialisée automatiquement dans `/tmp/chronorh/chronorh.db` (transaction atomique)
-   - Les sessions sont signées par HMAC (`SESSION_SECRET` optionnel) et survivent aux démarrages à froid ou bascules d'instance
+   - Les sessions HMAC embarquent l’identité (id, nom, e-mail, rôle, expiration) et survivent aux démarrages à froid ou bascules d'instance
    - Contrôle de santé : `GET /api/health`
 
 ## 🏗️ Architecture
@@ -117,9 +122,9 @@ public/
   css/          Design system (tokens + composants)
   js/views/     Vues SPA : dashboard, employés, pointages, borne, paie…
 tests/
-  payroll.test.js   16 tests des règles de paie (node:test)
+  payroll.test.js   17 tests des règles de paie (node:test)
   qr.test.js        3 tests de génération/décodage QR
-  vercel.test.js    3 tests de compatibilité serverless Vercel
+  vercel.test.js    4 tests de compatibilité serverless Vercel
 vercel.json     Routage Vercel (/api/* → fonction serverless, SPA fallback)
 ```
 

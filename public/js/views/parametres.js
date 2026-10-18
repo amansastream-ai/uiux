@@ -64,7 +64,8 @@ export async function renderParametres(el, ctx) {
     content.innerHTML = `
       <div class="grid cols-2">
         <div class="card pad">
-          <h3 class="mb-4">Barème des majorations &amp; primes</h3>
+          <h3 class="mb-2">Barème des majorations &amp; primes</h3>
+          <p class="small muted mb-4">Les heures supplémentaires (+15 % / +40 %) et les majorations (nuit +60 %, dimanche/férié +60 %, nuit fériée +100 %) sont calculées directement sur le salaire de base mensuel — base 40 h/semaine.</p>
           <form id="r-form" class="form-grid">
             <div class="field"><label>🌙 Majoration nuit 22h→5h (%)</label>
               <input class="input" name="night_premium_pct" type="number" value="${R('night_premium_pct', 60)}" /></div>
@@ -72,7 +73,7 @@ export async function renderParametres(el, ctx) {
               <input class="input" name="rest_day_premium_pct" type="number" value="${R('rest_day_premium_pct', 60)}" /></div>
             <div class="field"><label>🌌 Nuit dimanche / férié 22h→5h (%)</label>
               <input class="input" name="rest_night_premium_pct" type="number" value="${R('rest_night_premium_pct', 100)}" /></div>
-            <div class="field"><label>Base hebdomadaire (h)</label>
+            <div class="field"><label>Seuil d’heures supplémentaires par semaine (h)</label>
               <input class="input" name="week_base_hours" type="number" value="${R('week_base_hours', 40)}" /></div>
             <div class="field"><label>⏱️ 1res heures sup./semaine à +15 % (h)</label>
               <input class="input" name="ot_week_first_hours" type="number" value="${R('ot_week_first_hours', 8)}" /></div>
@@ -88,8 +89,6 @@ export async function renderParametres(el, ctx) {
               <input class="input" value="Compteur (1, 2, 3…)" disabled /></div>
             <div class="field"><label>🎉 Heures payées par férié non travaillé</label>
               <input class="input" name="holiday_paid_hours" type="number" value="${R('holiday_paid_hours', 8)}" /></div>
-            <div class="field"><label>Diviseur horaire mensuel</label>
-              <input class="input" name="hourly_divisor" type="number" step="0.01" value="${R('hourly_divisor', 173.33)}" /></div>
             <div class="field"><label>IPRES salarié (%)</label>
               <input class="input" name="ipres_pct" type="number" step="0.1" value="${R('ipres_pct', 5.6)}" /></div>
             <div class="field"><label>CSS salarié (%)</label>
@@ -132,6 +131,7 @@ export async function renderParametres(el, ctx) {
           <div class="card pad">
             <h3 class="mb-2">📌 Rappel de la convention</h3>
             <ul class="small muted" style="line-height:2;padding-left:18px;margin:0">
+              <li>Les heures supplémentaires (+15 % / +40 %) et majorations (nuit +60 %, dimanche/férié +60 %, nuit fériée +100 %) sont calculées directement sur le salaire de base mensuel — base <b>40 h/semaine</b>.</li>
               <li>Travail de <b>22h à 5h</b> → majoration <b>60 %</b></li>
               <li>Travail le <b>dimanche</b> ou un <b>jour férié</b> → toutes les heures à <b>+60 %</b></li>
               <li><b>Dimanche/férié de nuit</b> (22h→5h) → majoration <b>100 %</b></li>
@@ -148,17 +148,18 @@ export async function renderParametres(el, ctx) {
       const salary = Number(content.querySelector('#sim-salary').value) || 0;
       const hours = Number(content.querySelector('#sim-hours').value) || 0;
       const sc = content.querySelector('#sim-scenario').value;
-      const rate = salary / (Number(R('hourly_divisor', 173.33)));
+      const monthlyBaseHours = 40 * 52 / 12;
       const pct = sc === 'night' ? Number(R('night_premium_pct', 60)) :
         sc === 'sunday' ? Number(R('rest_day_premium_pct', 60)) :
         sc === 'sundaynight' ? Number(R('rest_night_premium_pct', 100)) :
         sc === 'ot' ? Number(R('ot_rest_pct', 40)) : 0;
-      const amount = Math.round(hours * rate * (1 + pct / 100));
-      const premium = Math.round(hours * rate * pct / 100);
+      const baseAmount = salary * hours / monthlyBaseHours;
+      const amount = Math.round(baseAmount * (1 + pct / 100));
+      const premium = Math.round(baseAmount * pct / 100);
       const panier = (hours >= Number(R('panier_min_hours', 10)) || sc === 'night' || sc === 'sundaynight') ? 1 : 0;
       content.querySelector('#sim-panier').value = panier ? '1 panier (compté)' : '0 panier';
       content.querySelector('#sim-out').innerHTML = `
-        <div class="stat-line"><span class="lbl">Taux horaire</span><span class="val">${fcfa(rate)} / h</span></div>
+        <div class="stat-line"><span class="lbl">Base de calcul</span><span class="val">Salaire mensuel · 40 h/semaine</span></div>
         <div class="stat-line"><span class="lbl">Majoration appliquée</span><span class="val">+${pct} %</span></div>
         <div class="stat-line"><span class="lbl">Montant des heures</span><span class="val">${fcfa(amount)}</span></div>
         <div class="stat-line"><span class="lbl">dont majoration</span><span class="val" style="color:var(--gold-600)">${fcfa(premium)}</span></div>

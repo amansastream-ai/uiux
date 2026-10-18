@@ -49,7 +49,6 @@ const DEFAULT_RULES = {
   holiday_credit_only_unworked: 1,// pas de crédit 8h si le férié est travaillé
 
   // --- Paie ---
-  hourly_divisor: 173.33,         // 40 h × 52 semaines / 12 mois
   currency: 'XOF'
 };
 
@@ -220,71 +219,42 @@ function computePayroll(opts) {
   }
 
   // ---- 5. Montants (FCFA) ----
-  const hourlyRate = opts.baseSalary / rules.hourly_divisor;
   const money = (x) => Math.round(x); // FCFA entier
+  const monthlyBaseHours = 40 * 52 / 12;
+  const minutesAsHours = (m) => m / 60;
+  const premiumAmount = (hours, pct) => money(opts.baseSalary * hours / monthlyBaseHours * pct / 100);
 
-  // Répartition des primes nuit / férié
+  // Toutes les primes sont calculées directement sur le salaire de base mensuel,
+  // ramené à une base de 40 h/semaine (40 × 52 ÷ 12 heures mensuelles).
   const nightMinutes = totals.night;
   const restDayMinutes = totals.restDay;
   const restNightMinutes = totals.restNight;
-
-  // Taux effectif d'une minute selon son seau (hors h.sup.)
-  const nightRate = rules.night_premium_pct / 100;
-  const restRate = rules.rest_day_premium_pct / 100;
-  const restNightRate = rules.rest_night_premium_pct / 100;
-
-  const minutesAsHours = (m) => m / 60;
-
-  // Lignes de paie : chaque ligne = quantité (h) × tarif horaire × (1 + majoration)
-  // Pour rester exact, on ventile les heures sup. à cheval sur les seaux au
-  // prorata des minutes de chaque seau (approximation homogène, documentée).
-  const otMinutes = ot15 + ot40;
-  const otShare = totalMinutes > 0 ? otMinutes / totalMinutes : 0;
+  const nightPct = rules.night_premium_pct;
+  const restPct = rules.rest_day_premium_pct;
+  const restNightPct = rules.rest_night_premium_pct;
 
   const lines = [];
-  const addLine = (code, label, qtyHours, premiumPct, note) => {
-    const amount = money(qtyHours * hourlyRate * (1 + premiumPct / 100));
-    if (qtyHours <= 0) return;
-    lines.push({
-      code,
-      label,
-      quantity: Math.round(qtyHours * 100) / 100,
-      unit: 'h',
-      premium_pct: premiumPct,
-      rate: Math.round(hourlyRate * 100) / 100,
-      amount,
-      note: note || ''
-    });
-    return amount;
-  };
+  const ot15Hours = minutesAsHours(ot15);
+  const ot40Hours = minutesAsHours(ot40);
 
-  // Base ordinaire (hors majorations), net des minutes supplémentaires
-  const baseHours = minutesAsHours(totals.base) * (1 - otShare);
-  const nightHours = minutesAsHours(nightMinutes) * (1 - otShare);
-  const restHours = minutesAsHours(restDayMinutes) * (1 - otShare);
-  const restNightHours = minutesAsHours(restNightMinutes) * (1 - otShare);
-
-  // Salaire mensuel de base versé intégralement
+  // Salaire mensuel de base versé intégralement.
   lines.push({
     code: 'BASE',
     label: 'Salaire de base mensuel',
     quantity: 1,
     unit: 'mois',
     premium_pct: 0,
-    rate: money(opts.baseSalary),
     amount: money(opts.baseSalary),
     note: `${Math.round(minutesAsHours(totalMinutes) * 100) / 100} h travaillées dans le mois`
   });
 
-  // Heures sup. (la prime s'ajoute au salaire déjà payé via la base)
-  const ot15Hours = minutesAsHours(ot15);
-  const ot40Hours = minutesAsHours(ot40);
+  // Les heures supplémentaires ajoutent uniquement leur majoration au salaire de base.
   if (ot15 > 0) {
     lines.push({
       code: 'HS15', label: 'Heures supplémentaires (+15 %)',
       quantity: Math.round(ot15Hours * 100) / 100, unit: 'h',
-      premium_pct: 15, rate: Math.round(hourlyRate * 100) / 100,
-      amount: money(ot15Hours * hourlyRate * 0.15),
+      premium_pct: 15,
+      amount: premiumAmount(ot15Hours, 15),
       note: '8 premières h.sup. de la semaine (dans le quota de 32 h/mois)'
     });
   }
@@ -292,68 +262,60 @@ function computePayroll(opts) {
     lines.push({
       code: 'HS40', label: 'Heures supplémentaires (+40 %)',
       quantity: Math.round(ot40Hours * 100) / 100, unit: 'h',
-      premium_pct: 40, rate: Math.round(hourlyRate * 100) / 100,
-      amount: money(ot40Hours * hourlyRate * 0.40),
+      premium_pct: 40,
+      amount: premiumAmount(ot40Hours, 40),
       note: 'Au-delà de 8 h.sup./semaine ou 32 h.sup./mois'
     });
   }
 
-  // Primes nuit / dimanche-férié (majoration seule, hors part supplémentaire)
+  // Primes nuit / dimanche-férié : chaque montant part du salaire mensuel de base.
   if (nightMinutes > 0) {
-    const extra = rules.premium_stacking === 'max'
-      ? Math.min(nightRate, 1) * minutesAsHours(nightMinutes) * hourlyRate * (otShare > 0 ? 1 : 1)
-      : nightRate * minutesAsHours(nightMinutes) * hourlyRate;
     lines.push({
-      code: 'NUIT', label: 'Majoration nuit (22h → 5h) (+60 %)',
+      code: 'NUIT', label: `Majoration nuit (22h → 5h) (+${nightPct} %)`,
       quantity: Math.round(minutesAsHours(nightMinutes) * 100) / 100, unit: 'h',
-      premium_pct: rules.night_premium_pct,
-      rate: Math.round(hourlyRate * 100) / 100,
-      amount: money(extra),
-      note: 'Heures travaillées entre 22h et 5h (hors dimanche/ferié)'
+      premium_pct: nightPct,
+      amount: premiumAmount(minutesAsHours(nightMinutes), nightPct),
+      note: 'Heures travaillées entre 22h et 5h (hors dimanche/férié)'
     });
   }
   if (restDayMinutes > 0) {
-    const extra = restRate * minutesAsHours(restDayMinutes) * hourlyRate;
     lines.push({
-      code: 'DIF', label: 'Majoration dimanche / jour férié (+60 %)',
+      code: 'DIF', label: `Majoration dimanche / jour férié (+${restPct} %)`,
       quantity: Math.round(minutesAsHours(restDayMinutes) * 100) / 100, unit: 'h',
-      premium_pct: rules.rest_day_premium_pct,
-      rate: Math.round(hourlyRate * 100) / 100,
-      amount: money(extra),
+      premium_pct: restPct,
+      amount: premiumAmount(minutesAsHours(restDayMinutes), restPct),
       note: 'Toutes les heures travaillées le dimanche ou un jour férié'
     });
   }
   if (restNightMinutes > 0) {
-    const extra = restNightRate * minutesAsHours(restNightMinutes) * hourlyRate;
     lines.push({
-      code: 'DIFN', label: 'Majoration nuit dimanche / férié (+100 %)',
+      code: 'DIFN', label: `Majoration nuit dimanche / férié (+${restNightPct} %)`,
       quantity: Math.round(minutesAsHours(restNightMinutes) * 100) / 100, unit: 'h',
-      premium_pct: rules.rest_night_premium_pct,
-      rate: Math.round(hourlyRate * 100) / 100,
-      amount: money(extra),
+      premium_pct: restNightPct,
+      amount: premiumAmount(minutesAsHours(restNightMinutes), restNightPct),
       note: 'Dimanche ou férié de 22h à 5h du matin'
     });
   }
 
-  // Paniers : compteur pur (1, 2, 3…) — jamais converti en FCFA
+  // Paniers : compteur pur (1, 2, 3…) — jamais converti en FCFA.
   if (panierCount > 0) {
     lines.push({
       code: 'PANIER', label: 'Panier repas',
       quantity: panierCount, unit: panierCount > 1 ? 'paniers' : 'panier',
-      premium_pct: 0, rate: 0,
+      premium_pct: 0,
       amount: 0,
       note: `Journées ≥ ${rules.panier_min_hours} h ou comportant des heures de nuit`
     });
   }
 
-  // Jours fériés non travaillés (8 h)
+  // Jours fériés non travaillés (8 h), calculés sur la même base mensuelle.
   if (creditedHolidays.length > 0) {
     const qty = creditedHolidays.length * rules.holiday_paid_hours;
-    const amount = money(qty * hourlyRate);
+    const amount = money(opts.baseSalary * qty / monthlyBaseHours);
     lines.push({
       code: 'FERIE', label: 'Jours fériés payés (8 h)',
       quantity: qty, unit: 'h',
-      premium_pct: 0, rate: Math.round(hourlyRate * 100) / 100,
+      premium_pct: 0,
       amount,
       note: creditedHolidays.map((h) => `${h.date} — ${h.name}`).join(' · ')
     });
@@ -374,7 +336,6 @@ function computePayroll(opts) {
     },
     paniers: { count: panierCount, days: panierDays },
     holidays_credited: creditedHolidays,
-    hourly_rate: Math.round(hourlyRate * 100) / 100,
     lines,
     gross
   };

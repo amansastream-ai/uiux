@@ -38,6 +38,53 @@ function apiRouter(db) {
   });
 
   // ============================================================ AUTH
+  router.post('/auth/register', (req, res) => {
+    const body = req.body || {};
+    const name = String(body.name || '').trim().replace(/\s+/g, ' ');
+    const email = String(body.email || '').trim().toLowerCase();
+    const password = String(body.password || '');
+    const selectedRole = String(body.role || '').trim().toLowerCase();
+    const role = selectedRole === 'pointeur' ? 'pointage' : selectedRole;
+    const companyName = String(body.company_name || '').trim();
+
+    if (name.length < 2 || name.length > 100) {
+      return res.status(400).json({ error: 'Le nom complet doit contenir entre 2 et 100 caractères' });
+    }
+    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'Adresse e-mail invalide' });
+    }
+    if (password.length < 8 || password.length > 128) {
+      return res.status(400).json({ error: 'Le mot de passe doit contenir entre 8 et 128 caractères' });
+    }
+    if (!['admin', 'drh', 'comptable', 'pointage'].includes(role)) {
+      return res.status(400).json({ error: 'Choisissez un rôle valide : admin, drh, comptable ou pointeur' });
+    }
+    if (companyName.length > 120) {
+      return res.status(400).json({ error: 'Le nom de l’entreprise ne peut dépasser 120 caractères' });
+    }
+    if (db.prepare('SELECT id FROM users WHERE lower(email) = ?').get(email)) {
+      return res.status(409).json({ error: 'Cette adresse e-mail est déjà utilisée' });
+    }
+
+    try {
+      const passwordHash = require('./db').hashPassword(password);
+      const result = db.prepare('INSERT INTO users(name, email, password_hash, role) VALUES (?, ?, ?, ?)')
+        .run(name, email, passwordHash, role);
+      const user = db.prepare('SELECT id, name, email, role, active FROM users WHERE id = ?').get(result.lastInsertRowid);
+      if (companyName) {
+        db.prepare('INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)').run('company_name', companyName);
+      }
+      createSession(db, user.id, res);
+      audit(db, user, 'compte créé', `${user.name} (${user.role})`);
+      return res.status(201).json({ user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+    } catch (err) {
+      if (String(err.code || '').includes('CONSTRAINT') || /UNIQUE/i.test(err.message || '')) {
+        return res.status(409).json({ error: 'Cette adresse e-mail est déjà utilisée' });
+      }
+      return res.status(500).json({ error: 'Création du compte impossible' });
+    }
+  });
+
   router.post('/auth/login', (req, res) => {
     const { email, password } = req.body || {};
     const user = db.prepare('SELECT * FROM users WHERE email = ?').get(String(email || '').trim().toLowerCase());
@@ -408,7 +455,7 @@ function apiRouter(db) {
           position: e.position, department: e.department, base_salary: e.base_salary
         },
         hours: pay.hours, paniers: pay.paniers, lines: pay.lines,
-        hourly_rate: pay.hourly_rate, holidays_credited: pay.holidays_credited,
+        holidays_credited: pay.holidays_credited,
         gross: pay.gross, deductions, net: pay.gross - totalDed
       };
     });

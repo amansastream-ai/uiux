@@ -15,7 +15,7 @@ export async function renderEmployes(el, ctx) {
     <div class="page-head">
       <div>
         <h2>Employés &amp; badges</h2>
-        <div class="sub">${employees.length} employé(s) — badges QR et empreintes digitales</div>
+        <div class="sub">${employees.length} employé(s) — salaire de base mensuel servant au calcul direct des h.sup. et majorations (base 40 h/semaine)</div>
       </div>
       <div class="actions">
         <div class="search-box" style="width:260px">
@@ -186,8 +186,8 @@ export async function renderEmployes(el, ctx) {
               </div>
             </div>
             <div class="card pad" style="background:var(--gray-50)">
-              <div class="stat-line"><span class="lbl">Salaire de base</span><span class="val">${fcfa(e.base_salary)}</span></div>
-              <div class="stat-line"><span class="lbl">Taux horaire</span><span class="val">${fcfa(e.base_salary / 173.33)} / h</span></div>
+              <div class="stat-line"><span class="lbl">Salaire de base mensuel</span><span class="val">${fcfa(e.base_salary)}</span></div>
+              <p class="tiny muted mt-2">Les heures supplémentaires (+15 % / +40 %) et majorations (nuit +60 %, dimanche/férié +60 %, nuit fériée +100 %) sont calculées directement sur ce salaire — base 40 h/semaine.</p>
               <div class="stat-line"><span class="lbl">Horaires</span><span class="val">${esc(e.schedule_name)} · ${esc(e.schedule_start)}–${esc(e.schedule_end)}</span></div>
               <div class="stat-line"><span class="lbl">Téléphone</span><span class="val">${esc(e.phone || '—')}</span></div>
               <div class="stat-line"><span class="lbl">E-mail</span><span class="val small">${esc(e.email || '—')}</span></div>
