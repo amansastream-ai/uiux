@@ -14,7 +14,7 @@ export async function renderPaie(el, ctx) {
     <div class="page-head">
       <div>
         <h2>Paie &amp; salaires</h2>
-        <div class="sub">Heures, majorations (nuit, dimanche/férié, supplémentaires), paniers et net à payer en FCFA</div>
+        <div class="sub">H.sup. (+15 % / +40 %) et majorations (nuit +60 %, dimanche/férié +60 %, nuit fériée +100 %) calculées directement sur le salaire de base mensuel — base 40 h/semaine.</div>
       </div>
       <div class="actions">
         <input class="input" type="month" id="pay-period" value="${period}" style="width:170px" />
@@ -36,6 +36,7 @@ export async function renderPaie(el, ctx) {
             <span class="rule-chip" style="background:rgba(255,255,255,.1);color:#DCE6F2">🧺 Panier si ≥ 10 h ou nuit — <b style="color:#8FD8BC">compteur 1, 2, 3…</b></span>
             <span class="rule-chip" style="background:rgba(255,255,255,.1);color:#DCE6F2">🎉 Jour férié non travaillé = <b style="color:#F6D78A">8 h payées</b></span>
           </div>
+          <div class="tiny mt-2" style="color:#C8D5E4">Toutes les primes sont calculées directement sur le salaire de base mensuel (base 40 h/semaine).</div>
         </div>
         <div style="text-align:right">
           <div class="tiny" style="color:#9FB0C6">Période sélectionnée</div>
@@ -151,7 +152,7 @@ export async function renderPaie(el, ctx) {
             </tr>`).join('')}
         </tbody>
       </table></div>
-      <div class="tiny muted mt-4" style="padding:0 16px 12px">Cliquez sur une ligne pour voir le détail du calcul · Taux horaire = salaire ÷ 173,33 h</div>`
+      <div class="tiny muted mt-4" style="padding:0 16px 12px">Cliquez sur une ligne pour voir le détail. Les h.sup. (+15 % / +40 %) et majorations nuit (+60 %), dimanche/férié (+60 %), nuit fériée (+100 %) partent du salaire de base mensuel (base 40 h/semaine).</div>`
       : emptyState('users', 'Aucun employé actif');
 
     el.querySelectorAll('.breakdown-row').forEach((row) => row.addEventListener('click', (e) => {
@@ -173,6 +174,7 @@ export async function renderPaie(el, ctx) {
       <div class="grid cols-2">
         <div>
           <div class="b mb-2">Lignes de paie</div>
+          <div class="tiny muted mb-2">Calcul sur le salaire de base mensuel, base 40 h/semaine ; les h.sup. et majorations affichées appliquent le pourcentage correspondant à cette base.</div>
           <div class="payslip">
             <table>
               ${r.lines.map((l) => `
@@ -203,7 +205,6 @@ export async function renderPaie(el, ctx) {
             <div class="stat-line"><span class="lbl">Nuit dimanche/férié</span><span class="val">${num(r.hours.rest_night)} h</span></div>
             <div class="stat-line"><span class="lbl">H.sup. +15 %</span><span class="val">${num(r.hours.overtime_15)} h</span></div>
             <div class="stat-line"><span class="lbl">H.sup. +40 %</span><span class="val">${num(r.hours.overtime_40)} h</span></div>
-            <div class="stat-line"><span class="lbl">Taux horaire</span><span class="val">${fcfa(r.hourly_rate)} / h</span></div>
             <div class="stat-line"><span class="lbl">Jours fériés crédités</span><span class="val">${r.holidays_credited.map((h) => esc(h.name)).join(', ') || '—'}</span></div>
           </div>
         </div>
@@ -241,7 +242,7 @@ export async function renderPaie(el, ctx) {
             <div style="text-align:right">
               <div class="tiny muted">Salaire de base mensuel</div>
               <div class="b">${fcfa(r.employee.base_salary)}</div>
-              <div class="tiny muted">Taux horaire : ${fcfa(r.hourly_rate)}</div>
+              <div class="tiny muted">Calcul des h.sup. et majorations sur le salaire mensuel — base 40 h/semaine.</div>
             </div>
           </div>
           <table>
@@ -258,7 +259,7 @@ export async function renderPaie(el, ctx) {
           <div class="tiny muted mt-4">
             Heures : ${num(r.hours.total)} h au total — nuit ${num(r.hours.night)} h · dimanche/férié ${num(r.hours.rest_day + r.hours.rest_night)} h ·
             h.sup. ${num(r.hours.overtime_15 + r.hours.overtime_40)} h · paniers : ${r.paniers.count}.<br/>
-            Majorations appliquées selon la convention : nuit +60 %, dimanche/férié +60 %, nuit fériée +100 %, h.sup. +15 % puis +40 %.
+            Majorations appliquées sur le salaire de base mensuel (base 40 h/semaine) : nuit +60 %, dimanche/férié +60 %, nuit fériée +100 %, h.sup. +15 % puis +40 %.
           </div>
         </div>`,
       footer: `<button class="btn outline" data-close>Fermer</button>

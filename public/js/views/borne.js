@@ -15,7 +15,11 @@ export async function renderBorne(el, ctx) {
         <div class="k-time" id="k-time">--:--:--</div>
         <div class="k-date" id="k-date"></div>
       </div>
-      <button class="btn outline" id="k-exit" style="border-color:rgba(255,255,255,.25);color:#fff">Quitter</button>
+      <div class="kiosk-top-actions">
+        <button class="btn outline" id="k-account" type="button">Autre compte</button>
+        <button class="btn outline" id="k-exit" type="button">Quitter la borne</button>
+        <button class="btn danger" id="k-logout" type="button">${icons.logout} Sortir</button>
+      </div>
     </div>
     <div class="kiosk-main">
       <div class="scan-zone">
@@ -72,6 +76,19 @@ export async function renderBorne(el, ctx) {
   };
   tickClock();
   const clockTimer = setInterval(tickClock, 1000);
+  let cameraStream = null;
+  const cleanup = () => {
+    clearInterval(clockTimer);
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+      cameraStream = null;
+    }
+    const video = el.querySelector('#k-video');
+    if (video) {
+      video.srcObject = null;
+      video.style.display = 'none';
+    }
+  };
 
   // Remplir le select d'empreintes + journal
   const { employees } = await api.get('/employees');
@@ -150,6 +167,7 @@ export async function renderBorne(el, ctx) {
     const video = el.querySelector('#k-video');
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      cameraStream = stream;
       video.srcObject = stream;
       video.style.display = 'block';
       feedback(true, 'Caméra activée', 'Présentez le QR devant la caméra…', null);
@@ -169,6 +187,8 @@ export async function renderBorne(el, ctx) {
           const code = window.jsQR(img.data, img.width, img.height, { inversionAttempts: 'attemptBoth' });
           if (code && code.data) {
             stream.getTracks().forEach((t) => t.stop());
+            cameraStream = null;
+            video.srcObject = null;
             video.style.display = 'none';
             punch({ code: code.data });
             return;
@@ -182,8 +202,15 @@ export async function renderBorne(el, ctx) {
     }
   });
 
+  el.querySelector('#k-account').addEventListener('click', () => {
+    ctx.openAccountSwitcher({ onChange: cleanup });
+  });
   el.querySelector('#k-exit').addEventListener('click', () => {
-    clearInterval(clockTimer);
+    cleanup();
     ctx.go('#/dashboard');
+  });
+  el.querySelector('#k-logout').addEventListener('click', () => {
+    cleanup();
+    ctx.logout();
   });
 }

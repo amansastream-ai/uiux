@@ -6,6 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const fs = require('node:fs');
 const { open, schema, seed, resolveDbPath } = require('../server/db');
+const { verifyTokenPayload } = require('../server/auth');
 const appModule = require('../server/index');
 const vercelHandler = require('../api/index');
 
@@ -105,4 +106,68 @@ test('Vercel : la session survit à un démarrage à froid / changement d’inst
   const empB = instB.db.prepare("SELECT qr_token, fingerprint_id FROM employees WHERE matricule = 'EMP-001'").get();
   assert.equal(empA.qr_token, empB.qr_token);
   assert.equal(empA.fingerprint_id, empB.fingerprint_id);
+});
+
+test('Création de compte : rôle Pointeur, entreprise facultative et session stateless entre instances', async () => {
+  const instA = createTempDb('registerA');
+  const instB = createTempDb('registerB');
+  const appA = appModule.createApp(instA.db);
+  const appB = appModule.createApp(instB.db);
+
+  const registration = await requestHandler(appA, {
+    method: 'POST',
+    url: '/api/auth/register',
+    body: {
+      name: 'Aminata Test',
+      email: 'AMINATA.TEST@EXAMPLE.SN',
+      password: 'secure-pass-2026',
+      role: 'pointeur',
+      company_name: 'Entreprise Test'
+    }
+  });
+  assert.equal(registration.status, 201);
+  assert.equal(registration.json.user.role, 'pointage');
+  assert.equal(registration.json.user.email, 'aminata.test@example.sn');
+  assert.equal(instA.db.prepare('SELECT COUNT(*) AS n FROM users').get().n, 5);
+  assert.equal(instA.db.prepare(`SELECT COUNT(*) AS n FROM users
+    WHERE email IN ('admin@sahelservices.sn', 'drh@sahelservices.sn', 'compta@sahelservices.sn', 'pointage@sahelservices.sn')`).get().n, 4);
+  assert.equal(instA.db.prepare('SELECT COUNT(*) AS n FROM employees').get().n, 12);
+
+  const cookie = registration.setCookie.split(';')[0];
+  const token = cookie.slice('chronorh_session='.length);
+  const claims = verifyTokenPayload(token);
+  assert.equal(claims.name, 'Aminata Test');
+  assert.equal(claims.email, 'aminata.test@example.sn');
+  assert.equal(claims.role, 'pointage');
+  assert.equal(typeof claims.exp, 'number');
+  assert.ok(claims.u);
+
+  const meOnA = await requestHandler(appA, { url: '/api/auth/me', cookie });
+  assert.equal(meOnA.status, 200);
+  assert.equal(meOnA.json.settings.company_name, 'Entreprise Test');
+
+  const meOnB = await requestHandler(appB, { url: '/api/auth/me', cookie });
+  assert.equal(meOnB.status, 200, 'Le jeton signé doit restaurer le compte sur une nouvelle instance');
+  assert.equal(meOnB.json.user.name, 'Aminata Test');
+  assert.equal(meOnB.json.user.email, 'aminata.test@example.sn');
+  assert.equal(meOnB.json.user.role, 'pointage');
+  assert.equal(instB.db.prepare('SELECT COUNT(*) AS n FROM employees').get().n, 12);
+
+  const punch = await requestHandler(appB, {
+    method: 'POST',
+    url: '/api/attendance',
+    body: { employee_id: 1, type: 'in', ts: '2026-10-18T08:00:00', method: 'manual' },
+    cookie
+  });
+  assert.equal(punch.status, 201, 'Le compte restauré garde ses droits dans les routes nécessitant un utilisateur local');
+
+  const duplicate = await requestHandler(appA, {
+    method: 'POST',
+    url: '/api/auth/register',
+    body: {
+      name: 'Another Name', email: 'aminata.test@example.sn',
+      password: 'secure-pass-2026', role: 'admin'
+    }
+  });
+  assert.equal(duplicate.status, 409);
 });

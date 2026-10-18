@@ -73,7 +73,7 @@ export async function renderUtilisateurs(el, ctx) {
         </form>
         <div class="login-note mt-4">
           <b>Rôles :</b> Administrateur (tout) · DRH (employés, badges, pointages) ·
-          Comptable (paie, paiements) · Gestion pointage (borne, corrections).
+          Comptable (paie, paiements) · Pointeur (borne, corrections).
         </div>`,
       footer: `<button class="btn outline" data-close>Annuler</button>
                <button class="btn primary" id="u-save">${isNew ? 'Créer' : 'Enregistrer'}</button>`

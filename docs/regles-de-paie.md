@@ -4,26 +4,47 @@ Toutes les valeurs ci-dessous sont **paramétrables** (admin → *Paramètres �
 
 ## 1. Base de calcul
 
-- **Taux horaire** = salaire mensuel ÷ **173,33 h** (40 h × 52 semaines ÷ 12 mois)
-- Les pointages (QR / empreinte / manuel) sont appariés en sessions `entrée → sortie`
-- Chaque minute d'une session est classée dans un seau exclusif :
-  - **jour ordinaire**
-  - **nuit** (22h00 → 05h00)
-  - **dimanche / jour férié**
-  - **dimanche / jour férié de nuit** (22h00 → 05h00)
-- Les heures supplémentaires s'ajoutent par-dessus (cumul des majorations).
+Le salaire de base est mensuel. Les heures supplémentaires (**+15 %**, **+40 %**) et
+les majorations (nuit **+60 %**, dimanche/férié **+60 %**, nuit fériée **+100 %**)
+sont calculées directement sur ce salaire de base mensuel, avec une base de
+**40 h/semaine**.
 
-## 2. Majorations (exemples avec un taux horaire de 1 500 FCFA)
+Pour calculer une prime, ChronoRH applique la formule suivante :
 
-| Cas | Majoration | Valeur de l'heure | Pour 8 h |
-|---|---|---|---|
-| Jour ordinaire | — | 1 500 | 12 000 |
-| Nuit (22h→5h) | +60 % | 2 400 | 19 200 |
-| Dimanche ou férié | +60 % | 2 400 | 19 200 |
-| Nuit du dimanche / férié | +100 % | 3 000 | 24 000 |
+```text
+prime (FCFA) = salaire de base mensuel × heures concernées ÷ (40 × 52 ÷ 12) × pourcentage de majoration ÷ 100
+```
 
-> Une heure de nuit du dimanche remplace les deux primes (60 % + 60 %) par une
-> prime unique de **100 %**, conformément à la convention.
+Le salaire mensuel de base est versé intégralement ; les montants des majorations
+s’y ajoutent. Un jour férié non travaillé est crédité selon cette même base, sans
+majoration.
+
+Les pointages (QR / empreinte / manuel) sont appariés en sessions `entrée → sortie`.
+Chaque minute d'une session est classée dans un seau exclusif :
+
+- **jour ordinaire**
+- **nuit** (22h00 → 05h00)
+- **dimanche / jour férié**
+- **dimanche / jour férié de nuit** (22h00 → 05h00)
+
+Les heures supplémentaires s'ajoutent par-dessus les primes de nuit ou de repos
+lorsqu'elles portent sur les mêmes heures.
+
+## 2. Majorations
+
+Exemple pour un salaire de base mensuel de **260 000 FCFA** : les primes ci-dessous
+sont appliquées à la base correspondant au nombre d'heures concernées, puis
+ajoutées au salaire mensuel.
+
+| Cas | Majoration | Prime ajoutée pour 8 h |
+|---|---:|---:|
+| Jour ordinaire | — | — |
+| Nuit (22h→5h) | +60 % | 7 200 FCFA |
+| Dimanche ou férié | +60 % | 7 200 FCFA |
+| Nuit du dimanche / férié | +100 % | 12 000 FCFA |
+
+> Une heure de nuit du dimanche remplace les deux primes (+60 % nuit et +60 %
+> dimanche) par une prime unique de **+100 %**, conformément à la convention.
 
 ## 3. Heures supplémentaires
 
@@ -31,15 +52,16 @@ Toutes les valeurs ci-dessous sont **paramétrables** (admin → *Paramètres �
    - les **8 premières heures supplémentaires** → **+15 %**
    - **le reste** → **+40 %**
 2. **Quota mensuel** : au plus **32 heures supplémentaires par mois** peuvent
-   bénéficier du taux de 15 % (= 4 semaines × 8 h). Toute heure supplémentaire
-   au-delà → **+40 %**.
+   bénéficier de la majoration de 15 % (= 4 semaines × 8 h). Toute heure
+   supplémentaire au-delà → **+40 %**.
 
-**Cumul** : une heure supplémentaire de nuit, par exemple, touche
-`+60 % (nuit) + 40 % (h.sup.) = +100 %` → payée **×2**.
+**Cumul** : une heure supplémentaire de nuit peut recevoir les deux majorations :
+`+60 % (nuit) + 40 % (heures sup.) = +100 %` de prime sur la base mensuelle.
 
 ## 4. Panier repas (compteur)
 
 Un panier est dû pour une journée qui :
+
 - atteint **10 heures de travail** ou plus, **OU**
 - comporte la moindre **heure de nuit** (22h → 5h).
 
@@ -49,17 +71,17 @@ converti en francs CFA** et n'entre pas dans le brut.
 
 ## 5. Jours fériés
 
-- Chaque jour férié **non travaillé** est payé **8 heures** au taux normal.
-- Un jour férié **travaillé** : les heures effectives sont majorées
-  **+60 %** (jour) ou **+100 %** (nuit 22h→5h), **sans** crédit supplémentaire
-  de 8 h (pas de double paiement).
+- Chaque jour férié **non travaillé** est payé **8 heures**, calculées sur le salaire
+  de base mensuel (base 40 h/semaine).
+- Un jour férié **travaillé** : les heures effectives sont majorées **+60 %** (jour)
+  ou **+100 %** (nuit 22h→5h), **sans** crédit supplémentaire de 8 h (pas de double paiement).
 - La liste des fériés (Sénégal) est modifiable ; les dates religieuses sont
   fournies à titre indicatif (observation lunaire).
 
 ## 6. Cotisations salariales (par défaut)
 
 | Cotisation | Taux salarié | Base |
-|---|---|---|
+|---|---:|---|
 | IPRES retraite | 5,6 % | brut |
 | CSS couverture sociale | 5 % | brut |
 
@@ -67,15 +89,16 @@ converti en francs CFA** et n'entre pas dans le brut.
 
 ## 7. Exemple complet
 
-*Employé de nuit, salaire 275 000 FCFA (taux horaire ≈ 1 586 FCFA),
-semaine avec 45 h dont 30 h de nuit, sur un mois avec 3 dimanches travaillés :*
+Pour un salaire de base mensuel de **275 000 FCFA**, la base de calcul mensuelle
+est `40 × 52 ÷ 12` heures. À titre d'exemple, une semaine avec 45 h comprend
+5 h supplémentaires dans la tranche à **+15 %** ; la prime correspondante est
+calculée directement sur le salaire mensuel selon la formule de la section 1.
+Les heures de nuit, du dimanche ou d'un jour férié appliquent leurs majorations
+respectives à cette même base. Un férié non travaillé du mois crédite **8 h**.
 
-1. 5 h supplémentaires dans la semaine → 5 h à **+15 %** (dans les 8 premières)
-2. Les 30 h de nuit → **+60 %**
-3. Les 3 dimanches (24 h) → **+60 %**, dont les heures après 22h → **+100 %**
-4. Paniers : chaque journée de nuit → 1 panier
-5. Le férié non travaillé du mois → **+8 h payées**
-6. Brut → moins IPRES 5,6 % et CSS 5 % → **net à payer**
+Le panier reste un compteur. Le brut correspond au salaire mensuel de base,
+augmenté des primes et crédits applicables, puis les cotisations IPRES 5,6 % et
+CSS 5 % sont déduites pour obtenir le **net à payer**.
 
 Le détail ligne par ligne apparaît sur chaque **bulletin de paie** généré par
 ChronoRH (module *Paie → Bulletin*).

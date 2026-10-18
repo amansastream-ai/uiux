@@ -12,13 +12,28 @@ test('règle 1 : la nuit 22h→5h est majorée à 60 %', () => {
   const r = computePayroll({
     baseSalary: 173330, // → 1000 FCFA/h
     sessions: [{ start: '2026-10-12T22:00:00', end: '2026-10-13T02:00:00' }], // 4h de nuit (lundi)
-    holidays: none, rules: { hourly_divisor: 173.33 }, ...period
+    holidays: none, rules: {}, ...period
   });
   assert.equal(r.hours.night, 4);
   assert.equal(r.hours.total, 4);
   const nuit = r.lines.find((l) => l.code === 'NUIT');
   assert.ok(nuit);
   assert.equal(nuit.amount, Math.round(4 * 1000 * 0.6)); // 2400
+});
+
+test('base mensuelle : les primes sont calculées directement sur le salaire de base (40 h/semaine)', () => {
+  const baseSalary = 260000;
+  const r = computePayroll({
+    baseSalary,
+    sessions: [{ start: '2026-10-12T22:00:00', end: '2026-10-12T23:00:00' }],
+    holidays: none, rules: {}, ...period
+  });
+  const night = r.lines.find((line) => line.code === 'NUIT');
+  const baseHoursPerMonth = 40 * 52 / 12;
+  assert.equal(night.amount, Math.round(baseSalary * 1 / baseHoursPerMonth * 0.6));
+  assert.equal(r.lines.find((line) => line.code === 'BASE').amount, baseSalary);
+  assert.equal(Object.hasOwn(r, 'hourly_rate'), false);
+  assert.equal(Object.hasOwn(night, 'rate'), false);
 });
 
 test('règle 2 : dimanche/jour férié → toutes les heures à 60 %', () => {

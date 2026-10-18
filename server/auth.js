@@ -4,9 +4,11 @@
  * Compatible multi-instances serverless (Vercel) : jeton signé HMAC + persistance SQLite.
  */
 const crypto = require('node:crypto');
+const { hashPassword } = require('./db');
 
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 h
 const COOKIE = 'chronorh_session';
+const VALID_ROLES = new Set(['admin', 'drh', 'comptable', 'pointage']);
 const revokedTokens = new Set();
 
 function getSessionSecret() {
@@ -50,16 +52,20 @@ function verifyTokenPayload(token) {
 }
 
 function createSession(db, userId, res) {
-  const userRow = db.prepare('SELECT id, email FROM users WHERE id = ?').get(userId);
+  const userRow = db.prepare('SELECT id, name, email, role FROM users WHERE id = ?').get(userId);
+  if (!userRow) throw new Error('Utilisateur introuvable pour créer la session');
+
   const expMs = Date.now() + SESSION_TTL_MS;
   const expires = new Date(expMs).toISOString();
   const token = signTokenPayload({
-    u: userId,
-    email: userRow ? userRow.email : undefined,
+    u: userRow.id,
+    name: userRow.name,
+    email: userRow.email,
+    role: userRow.role,
     exp: expMs,
     jti: crypto.randomBytes(12).toString('hex')
   });
-  db.prepare('INSERT OR REPLACE INTO sessions(token, user_id, expires_at) VALUES (?, ?, ?)').run(token, userId, expires);
+  db.prepare('INSERT OR REPLACE INTO sessions(token, user_id, expires_at) VALUES (?, ?, ?)').run(token, userRow.id, expires);
   res.cookie(COOKIE, token, {
     httpOnly: true,
     sameSite: 'lax',
@@ -79,6 +85,35 @@ function destroySession(db, req, res) {
   res.clearCookie(COOKIE, { path: '/' });
 }
 
+function findUserByEmail(db, email) {
+  if (!email) return null;
+  return db.prepare('SELECT id, name, email, role, active FROM users WHERE lower(email) = ?').get(email.toLowerCase()) || null;
+}
+
+/**
+ * Recrée localement le compte porté par un jeton HMAC lorsqu'une instance
+ * serverless neuve ne possède pas encore sa ligne SQLite. Le mot de passe
+ * aléatoire n'est connu de personne : l'authentification reste celle du jeton.
+ */
+function materializeTokenUser(db, payload) {
+  const email = typeof payload.email === 'string' ? payload.email.trim().toLowerCase() : '';
+  const name = typeof payload.name === 'string' ? payload.name.trim() : '';
+  const role = payload.role;
+  if (!email || !name || !VALID_ROLES.has(role)) return null;
+
+  let user = findUserByEmail(db, email);
+  if (user) return user.active ? user : null;
+
+  try {
+    db.prepare('INSERT INTO users(name, email, password_hash, role) VALUES (?, ?, ?, ?)')
+      .run(name, email, hashPassword(crypto.randomBytes(32).toString('hex')), role);
+  } catch {
+    // Une requête simultanée a pu matérialiser le même compte entre-temps.
+  }
+  user = findUserByEmail(db, email);
+  return user && user.active ? user : null;
+}
+
 function currentUser(db, req) {
   const token = req.cookies && req.cookies[COOKIE];
   if (!token || revokedTokens.has(token)) return null;
@@ -89,19 +124,27 @@ function currentUser(db, req) {
   `).get(token);
   if (row) return row;
 
-  // Repli stateless signé (bascule d'instance ou démarrage à froid Vercel)
+  // Repli stateless signé pour un démarrage à froid / changement d'instance.
   const payload = verifyTokenPayload(token);
   if (!payload) return null;
-  const user =
-    (payload.email &&
-      db.prepare('SELECT id, name, email, role, active FROM users WHERE email = ? AND active = 1').get(payload.email)) ||
-    db.prepare('SELECT id, name, email, role, active FROM users WHERE id = ? AND active = 1').get(payload.u);
+
+  // Les sessions historiques contenaient seulement l'e-mail et l'identifiant.
+  // Les nouveaux jetons portent l'identité complète pour les comptes créés à la volée.
+  let user = materializeTokenUser(db, payload);
+  if (!user && typeof payload.name !== 'string' && payload.email) {
+    user = findUserByEmail(db, payload.email);
+    if (user && !user.active) user = null;
+  }
+  if (!user && !payload.email && payload.u != null) {
+    user = db.prepare('SELECT id, name, email, role, active FROM users WHERE id = ? AND active = 1').get(payload.u) || null;
+  }
   if (!user) return null;
+
   try {
     db.prepare('INSERT OR IGNORE INTO sessions(token, user_id, expires_at) VALUES (?, ?, ?)')
       .run(token, user.id, new Date(payload.exp).toISOString());
   } catch {
-    // ignore
+    // La session signée reste valide même si l'instance n'enregistre pas le cache SQLite.
   }
   return user;
 }
