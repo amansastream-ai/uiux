@@ -59,7 +59,7 @@ des **majorations** (nuit, dimanche/jour férié, heures supplémentaires) et de
 ```bash
 npm install
 npm start          # → http://localhost:3000
-npm test           # 19 tests : règles de paie + QR scannables
+npm test           # 22 tests : règles de paie + QR scannables + serverless Vercel
 ```
 
 Node.js ≥ 22 requis (SQLite natif `node:sqlite`, aucune compilation).
@@ -89,20 +89,38 @@ et un bordereau de paie de septembre validé avec paiements (Wave, virement).
 5. Pour l'empreinte : connecter un capteur biométrique USB et enrôler les employés
    depuis leur fiche (le mode simulation permet de tester le parcours complet)
 
+## ☁️ Déploiement sur Vercel
+
+Le dépôt est prêt pour un déploiement direct sur **Vercel** (aucune configuration manuelle requise) :
+
+1. Importer le dépôt sur Vercel et sélectionner la branche `application-drh`
+2. Laisser les paramètres par défaut (Node.js ≥ 22, `vercel.json` détecté automatiquement)
+3. Cliquer sur **Deploy** :
+   - Les fichiers statiques (`public/`) sont servis par le CDN Vercel
+   - L'API Express (`/api/*`) est exécutée par la fonction serverless `api/index.js`
+   - La base SQLite de démonstration est initialisée automatiquement dans `/tmp/chronorh/chronorh.db` (transaction atomique)
+   - Les sessions sont signées par HMAC (`SESSION_SECRET` optionnel) et survivent aux démarrages à froid ou bascules d'instance
+   - Contrôle de santé : `GET /api/health`
+
 ## 🏗️ Architecture
 
 ```
+api/
+  index.js      Point d'entrée Serverless Function (Vercel)
 server/
   index.js      Serveur Express (API + SPA)
-  db.js         SQLite (node:sqlite) — schéma & données de démo
+  db.js         SQLite (node:sqlite) — schéma & données de démo (compatible /tmp)
   api.js        API REST (auth, employés, pointages, paie, rapports…)
   payroll.js    Moteur de calcul : majorations, h.sup., paniers, fériés
-  auth.js       Sessions, rôles, journal d'audit
+  auth.js       Sessions signées HMAC + SQLite, rôles, journal d'audit
 public/
   css/          Design system (tokens + composants)
   js/views/     Vues SPA : dashboard, employés, pointages, borne, paie…
 tests/
   payroll.test.js   16 tests des règles de paie (node:test)
+  qr.test.js        3 tests de génération/décodage QR
+  vercel.test.js    3 tests de compatibilité serverless Vercel
+vercel.json     Routage Vercel (/api/* → fonction serverless, SPA fallback)
 ```
 
 La devise est le **FCFA (XOF)** partout : salaires, paniers, bulletins, exports.

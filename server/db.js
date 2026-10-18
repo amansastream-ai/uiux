@@ -3,14 +3,40 @@
  * ChronoRH — couche base de données (SQLite via node:sqlite)
  * Schéma + jeu de données de démonstration.
  */
-const { DatabaseSync } = require('node:sqlite');
+const sqlite = (typeof process.getBuiltinModule === 'function' && process.getBuiltinModule('node:sqlite')) || require('node:sqlite');
+const { DatabaseSync } = sqlite;
 const crypto = require('node:crypto');
 const path = require('node:path');
 const fs = require('node:fs');
+const os = require('node:os');
 const { DEFAULT_RULES } = require('./payroll');
 
-const DATA_DIR = path.join(__dirname, '..', 'data');
-const DB_PATH = path.join(DATA_DIR, 'chronorh.db');
+function isServerlessEnv() {
+  return Boolean(
+    process.env.VERCEL ||
+    process.env.VERCEL_ENV ||
+    process.env.AWS_LAMBDA_FUNCTION_NAME ||
+    process.env.NETLIFY
+  );
+}
+
+function resolveDbPath(customPath) {
+  if (customPath) return customPath;
+  if (process.env.CHRONORH_DB_PATH) return process.env.CHRONORH_DB_PATH;
+  const preferredDir = process.env.CHRONORH_DATA_DIR ||
+    (isServerlessEnv() ? path.join(os.tmpdir(), 'chronorh') : path.join(__dirname, '..', 'data'));
+  try {
+    fs.mkdirSync(preferredDir, { recursive: true });
+    fs.accessSync(preferredDir, fs.constants.W_OK);
+    return path.join(preferredDir, 'chronorh.db');
+  } catch {
+    const fallbackDir = path.join(os.tmpdir(), 'chronorh');
+    fs.mkdirSync(fallbackDir, { recursive: true });
+    return path.join(fallbackDir, 'chronorh.db');
+  }
+}
+
+const DB_PATH = resolveDbPath();
 
 function hashPassword(password, salt) {
   salt = salt || crypto.randomBytes(16).toString('hex');
@@ -20,14 +46,20 @@ function hashPassword(password, salt) {
 
 function verifyPassword(password, stored) {
   const [salt, hash] = String(stored).split(':');
+  if (!salt || !hash) return false;
   const check = crypto.scryptSync(password, salt, 64).toString('hex');
   return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(check, 'hex'));
 }
 
-function open() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  const db = new DatabaseSync(DB_PATH);
-  db.exec('PRAGMA journal_mode = WAL');
+function open(customPath) {
+  const targetPath = resolveDbPath(customPath);
+  fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+  const db = new DatabaseSync(targetPath);
+  try {
+    db.exec('PRAGMA journal_mode = WAL');
+  } catch {
+    // Sur certains systèmes de fichiers éphémères (/tmp serverless), le mode par défaut suffit
+  }
   db.exec('PRAGMA foreign_keys = ON');
   return db;
 }
@@ -136,8 +168,15 @@ function schema(db) {
 }
 
 function seed(db) {
-  const count = db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
-  if (count > 0) return false;
+  const userCount = db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
+  const empCount = db.prepare('SELECT COUNT(*) AS n FROM employees').get().n;
+  if (userCount >= 4 && empCount >= 12) return false;
+
+  db.exec('BEGIN');
+  try {
+    if (userCount > 0 || empCount > 0) {
+      db.exec('DELETE FROM attendance; DELETE FROM employees; DELETE FROM departments; DELETE FROM sessions; DELETE FROM users;');
+    }
 
   // ---------- Paramètres société ----------
   const set = db.prepare('INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)');
@@ -192,8 +231,9 @@ function seed(db) {
   ];
   let fpSeq = 1;
   for (const e of employees) {
-    const qr = 'QR-' + crypto.randomBytes(6).toString('hex').toUpperCase();
-    const fp = 'FP-' + crypto.randomBytes(8).toString('hex').toUpperCase();
+    const digest = crypto.createHash('sha256').update(`chronorh-demo-${e[0]}`).digest('hex').toUpperCase();
+    const qr = 'QR-' + digest.slice(0, 12);
+    const fp = 'FP-' + digest.slice(12, 28);
     emp.run(e[0], e[1], e[2], e[3], e[4], e[5], e[6], e[7], e[8], e[9], e[10], e[11], e[12], qr, fp);
     fpSeq++;
   }
@@ -218,7 +258,12 @@ function seed(db) {
 
   db.prepare(`INSERT INTO audit_logs(user_id, user_name, action, details) VALUES (?, ?, ?, ?)`)
     .run(1, 'Système', 'initialisation', 'Base de démonstration créée avec succès');
+  db.exec('COMMIT');
   return true;
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch { /* ignore */ }
+    throw err;
+  }
 }
 
 function seedAttendance(db) {
@@ -303,4 +348,5 @@ function seedAttendance(db) {
   att.run(7, 'in', '2026-09-23T07:15:00', 'manual', 'Bureau', 'Badge QR non reconnu, saisie manuelle');
 }
 
-module.exports = { open, schema, seed, hashPassword, verifyPassword, DB_PATH };
+module.exports = { open, schema, seed, hashPassword, verifyPassword, DB_PATH, resolveDbPath, isServerlessEnv };
+
