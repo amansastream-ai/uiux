@@ -33,7 +33,7 @@ export async function renderPaie(el, ctx) {
             <span class="rule-chip" style="background:rgba(255,255,255,.1);color:#DCE6F2">🌌 Nuit dimanche/férié <b style="color:#F6D78A">+100 %</b></span>
             <span class="rule-chip" style="background:rgba(255,255,255,.1);color:#DCE6F2">⏱️ H.sup. &gt; 40 h/sem. <b style="color:#8FD8BC">8 h à +15 %</b> puis <b style="color:#8FD8BC">+40 %</b></span>
             <span class="rule-chip" style="background:rgba(255,255,255,.1);color:#DCE6F2">📅 Quota 32 h.sup./mois à +15 %</span>
-            <span class="rule-chip" style="background:rgba(255,255,255,.1);color:#DCE6F2">🧺 Panier si ≥ 10 h ou nuit</span>
+            <span class="rule-chip" style="background:rgba(255,255,255,.1);color:#DCE6F2">🧺 Panier si ≥ 10 h ou nuit — <b style="color:#8FD8BC">compteur 1, 2, 3…</b></span>
             <span class="rule-chip" style="background:rgba(255,255,255,.1);color:#DCE6F2">🎉 Jour férié non travaillé = <b style="color:#F6D78A">8 h payées</b></span>
           </div>
         </div>
@@ -180,7 +180,7 @@ export async function renderPaie(el, ctx) {
                   <td>${esc(l.label)}${l.premium_pct ? ` <span class="badge gold" style="font-size:10px">+${l.premium_pct}%</span>` : ''}
                     <div class="tiny muted">${esc(l.note || '')}</div></td>
                   <td class="r">${l.quantity} ${l.unit}</td>
-                  <td class="r b">${fcfa(l.amount)}</td>
+                  <td class="r b">${l.code === 'PANIER' ? `<span class="badge gray">compté</span>` : fcfa(l.amount)}</td>
                 </tr>`).join('')}
               <tr class="tot"><td>Brut</td><td class="r"></td><td class="r">${fcfa(r.gross)}</td></tr>
             </table>
@@ -248,7 +248,7 @@ export async function renderPaie(el, ctx) {
             <thead><tr><td><b>Désignation</b></td><td class="r"><b>Quantité</b></td><td class="r"><b>Montant</b></td></tr></thead>
             <tbody>
               ${r.lines.map((l) => `
-                <tr><td>${esc(l.label)}</td><td class="r">${l.quantity} ${l.unit}</td><td class="r">${fcfa(l.amount)}</td></tr>`).join('')}
+                <tr><td>${esc(l.label)}</td><td class="r">${l.quantity} ${l.unit}</td><td class="r">${l.code === 'PANIER' ? '<span class="badge gray">compté</span>' : fcfa(l.amount)}</td></tr>`).join('')}
               <tr class="tot"><td>SALAIRE BRUT</td><td class="r"></td><td class="r">${fcfa(r.gross)}</td></tr>
               ${r.deductions.map((d) => `
                 <tr><td>${esc(d.label)}</td><td class="r">- ${d.rate} %</td><td class="r" style="color:var(--color-danger)">- ${fcfa(d.amount)}</td></tr>`).join('')}

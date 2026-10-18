@@ -84,8 +84,8 @@ export async function renderParametres(el, ctx) {
               <input class="input" name="ot_rest_pct" type="number" value="${R('ot_rest_pct', 40)}" /></div>
             <div class="field"><label>🧺 Panier si journée ≥ (h)</label>
               <input class="input" name="panier_min_hours" type="number" value="${R('panier_min_hours', 10)}" /></div>
-            <div class="field"><label>Montant du panier (FCFA)</label>
-              <input class="input" name="panier_amount" type="number" value="${R('panier_amount', 2500)}" /></div>
+            <div class="field"><label>Mode de comptage du panier</label>
+              <input class="input" value="Compteur (1, 2, 3…)" disabled /></div>
             <div class="field"><label>🎉 Heures payées par férié non travaillé</label>
               <input class="input" name="holiday_paid_hours" type="number" value="${R('holiday_paid_hours', 8)}" /></div>
             <div class="field"><label>Diviseur horaire mensuel</label>
@@ -137,7 +137,7 @@ export async function renderParametres(el, ctx) {
               <li><b>Dimanche/férié de nuit</b> (22h→5h) → majoration <b>100 %</b></li>
               <li>Au-delà de <b>40 h/semaine</b> : les <b>8 premières h.sup.</b> à <b>+15 %</b>, le reste à <b>+40 %</b></li>
               <li><b>32 h.sup./mois</b> maximum à +15 % (4 semaines × 8 h), le reste à <b>+40 %</b></li>
-              <li><b>Panier</b> si la journée atteint <b>10 h</b> ou comporte des heures de <b>nuit</b></li>
+              <li><b>Panier</b> si la journée atteint <b>10 h</b> ou comporte des heures de <b>nuit</b> — simple compteur (1, 2, 3…)</li>
               <li>Chaque <b>jour férié</b> non travaillé est payé <b>8 h</b></li>
             </ul>
           </div>
@@ -155,16 +155,15 @@ export async function renderParametres(el, ctx) {
         sc === 'ot' ? Number(R('ot_rest_pct', 40)) : 0;
       const amount = Math.round(hours * rate * (1 + pct / 100));
       const premium = Math.round(hours * rate * pct / 100);
-      const panier = (hours >= Number(R('panier_min_hours', 10)) || sc === 'night' || sc === 'sundaynight')
-        ? Number(R('panier_amount', 2500)) : 0;
-      content.querySelector('#sim-panier').value = panier ? `Oui (${fcfa(panier)})` : 'Non';
+      const panier = (hours >= Number(R('panier_min_hours', 10)) || sc === 'night' || sc === 'sundaynight') ? 1 : 0;
+      content.querySelector('#sim-panier').value = panier ? '1 panier (compté)' : '0 panier';
       content.querySelector('#sim-out').innerHTML = `
         <div class="stat-line"><span class="lbl">Taux horaire</span><span class="val">${fcfa(rate)} / h</span></div>
         <div class="stat-line"><span class="lbl">Majoration appliquée</span><span class="val">+${pct} %</span></div>
         <div class="stat-line"><span class="lbl">Montant des heures</span><span class="val">${fcfa(amount)}</span></div>
         <div class="stat-line"><span class="lbl">dont majoration</span><span class="val" style="color:var(--gold-600)">${fcfa(premium)}</span></div>
-        <div class="stat-line"><span class="lbl">Panier</span><span class="val">${panier ? fcfa(panier) : '—'}</span></div>
-        <div class="stat-line"><span class="lbl"><b>Total brut simulé</b></span><span class="val" style="font-size:16px">${fcfa(amount + panier)}</span></div>`;
+        <div class="stat-line"><span class="lbl">Paniers</span><span class="val">${panier ? '1' : '0'}</span></div>
+        <div class="stat-line"><span class="lbl"><b>Total brut simulé</b></span><span class="val" style="font-size:16px">${fcfa(amount)}</span></div>`;
     };
     ['#sim-salary', '#sim-hours', '#sim-scenario'].forEach((s) =>
       content.querySelector(s).addEventListener('input', sim));

@@ -37,13 +37,15 @@ Toutes les valeurs ci-dessous sont **paramétrables** (admin → *Paramètres �
 **Cumul** : une heure supplémentaire de nuit, par exemple, touche
 `+60 % (nuit) + 40 % (h.sup.) = +100 %` → payée **×2**.
 
-## 4. Panier repas
+## 4. Panier repas (compteur)
 
-Un panier (2 500 FCFA par défaut) est dû pour une journée qui :
+Un panier est dû pour une journée qui :
 - atteint **10 heures de travail** ou plus, **OU**
 - comporte la moindre **heure de nuit** (22h → 5h).
 
-Maximum : **1 panier par jour**.
+Maximum : **1 panier par jour**. Le panier est un **simple compteur**
+(1, 2, 3…) affiché sur le bulletin et dans les rapports : il n'est **jamais
+converti en francs CFA** et n'entre pas dans le brut.
 
 ## 5. Jours fériés
 

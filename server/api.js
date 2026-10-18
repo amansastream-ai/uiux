@@ -195,8 +195,23 @@ function apiRouter(db) {
     const e = db.prepare('SELECT * FROM employees WHERE id = ?').get(req.params.id);
     if (!e) return res.status(404).send('introuvable');
     const payload = `CHRONORH|${e.qr_token}`;
-    const svg = await QRCode.toString(payload, { type: 'svg', margin: 1, width: 320, color: { dark: '#0B1F33', light: '#FFFFFF' } });
-    res.type('image/svg+xml').send(svg);
+    const svg = await QRCode.toString(payload, { type: 'svg', margin: 2, width: 512, errorCorrectionLevel: 'Q', color: { dark: '#0B1F33', light: '#FFFFFF' } });
+    res.type('image/svg+xml');
+    if (req.query.dl) res.setHeader('Content-Disposition', `attachment; filename="badge-${e.matricule}.svg"`);
+    res.send(svg);
+  });
+
+  router.get('/employees/:id/badge.png', auth, async (req, res) => {
+    const e = db.prepare('SELECT * FROM employees WHERE id = ?').get(req.params.id);
+    if (!e) return res.status(404).send('introuvable');
+    const payload = `CHRONORH|${e.qr_token}`;
+    const buf = await QRCode.toBuffer(payload, {
+      type: 'png', width: 640, margin: 2, errorCorrectionLevel: 'Q',
+      color: { dark: '#0B1F33', light: '#FFFFFF' }
+    });
+    res.type('image/png');
+    if (req.query.dl) res.setHeader('Content-Disposition', `attachment; filename="badge-${e.matricule}.png"`);
+    res.send(buf);
   });
 
   router.get('/employees/:id/badge', auth, (req, res) => {
@@ -245,7 +260,10 @@ function apiRouter(db) {
     const { code, fingerprint_id } = req.body || {};
     let emp = null;
     if (code) {
-      const token = String(code).replace(/^CHRONORH\|/, '').trim();
+      // Accepte : "CHRONORH|QR-XXXX", "QR-XXXX", ou tout texte contenant le jeton
+      const raw = String(code).trim();
+      const match = raw.match(/QR-[A-Za-z0-9]+/);
+      const token = match ? match[0] : raw.replace(/^CHRONORH\|/, '');
       emp = db.prepare('SELECT * FROM employees WHERE qr_token = ?').get(token);
     } else if (fingerprint_id) {
       emp = db.prepare('SELECT * FROM employees WHERE fingerprint_id = ?').get(String(fingerprint_id).trim());

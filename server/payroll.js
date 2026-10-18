@@ -15,7 +15,8 @@
  *     (concrètement : +15 % si (parmi les 8 premières h.sup. de la semaine)
  *                      ET (dans le quota de 32 h.sup. à 15 % du mois), sinon +40 %)
  *  6. Panier repas si la journée atteint 10 h de travail, OU contient
- *     des heures de nuit.
+ *     des heures de nuit. Le panier est un COMPTEUR (1, 2, 3…) — il n'est
+ *     jamais converti en francs CFA.
  *  7. Chaque jour férié non travaillé est payé 8 heures.
  *
  * Cumul des majorations : une heure peut porter une prime « nuit / dimanche /
@@ -41,7 +42,7 @@ const DEFAULT_RULES = {
   // --- Panier ---
   panier_min_hours: 10,           // règle 6 : 10 h ou plus → panier
   panier_night: 1,                // règle 6 : toute heure de nuit → panier
-  panier_amount: 2500,            // montant du panier (FCFA)
+  // NB : le panier est un simple compteur (1, 2, 3…) — jamais converti en FCFA
 
   // --- Jours fériés ---
   holiday_paid_hours: 8,          // règle 7 : 8 h payées par férié non travaillé
@@ -197,7 +198,7 @@ function computePayroll(opts) {
     }
   }
 
-  // ---- 3. Paniers ----
+  // ---- 3. Paniers (compteur : 1, 2, 3…) ----
   const panierDays = [];
   for (const [dk, rec] of byDay) {
     const qualifies =
@@ -334,15 +335,13 @@ function computePayroll(opts) {
     });
   }
 
-  // Paniers
-  let panierAmount = 0;
+  // Paniers : compteur pur (1, 2, 3…) — jamais converti en FCFA
   if (panierCount > 0) {
-    panierAmount = money(panierCount * rules.panier_amount);
     lines.push({
       code: 'PANIER', label: 'Panier repas',
-      quantity: panierCount, unit: 'jour',
-      premium_pct: 0, rate: money(rules.panier_amount),
-      amount: panierAmount,
+      quantity: panierCount, unit: panierCount > 1 ? 'paniers' : 'panier',
+      premium_pct: 0, rate: 0,
+      amount: 0,
       note: `Journées ≥ ${rules.panier_min_hours} h ou comportant des heures de nuit`
     });
   }
@@ -373,7 +372,7 @@ function computePayroll(opts) {
       overtime_15: Math.round(ot15Hours * 100) / 100,
       overtime_40: Math.round(ot40Hours * 100) / 100
     },
-    paniers: { count: panierCount, days: panierDays, amount: panierAmount },
+    paniers: { count: panierCount, days: panierDays },
     holidays_credited: creditedHolidays,
     hourly_rate: Math.round(hourlyRate * 100) / 100,
     lines,

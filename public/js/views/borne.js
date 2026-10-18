@@ -166,7 +166,7 @@ export async function renderBorne(el, ctx) {
           c.width = video.videoWidth; c.height = video.videoHeight;
           c.getContext('2d').drawImage(video, 0, 0);
           const img = c.getContext('2d').getImageData(0, 0, c.width, c.height);
-          const code = window.jsQR(img.data, img.width, img.height);
+          const code = window.jsQR(img.data, img.width, img.height, { inversionAttempts: 'attemptBoth' });
           if (code && code.data) {
             stream.getTracks().forEach((t) => t.stop());
             video.style.display = 'none';

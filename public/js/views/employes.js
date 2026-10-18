@@ -147,10 +147,16 @@ export async function renderEmployes(el, ctx) {
         return;
       }
       try {
-        if (isNew) await api.post('/employees', data);
-        else await api.put(`/employees/${emp.id}`, data);
+        if (isNew) {
+          const created = await api.post('/employees', data);
+          m.close();
+          toast('success', 'Employé créé 🎉', 'Téléchargez son badge QR ci-dessous.');
+          openDetail(created.employee.id);
+          return;
+        }
+        await api.put(`/employees/${emp.id}`, data);
         m.close();
-        toast('success', isNew ? 'Employé créé 🎉' : 'Employé mis à jour');
+        toast('success', 'Employé mis à jour');
         ctx.refresh();
       } catch (e) {
         toast('error', 'Erreur', e.message);
@@ -194,11 +200,16 @@ export async function renderEmployes(el, ctx) {
             </div>
             <div class="divider"></div>
             <div class="b mb-2">Badge QR</div>
-            <div class="flex">
+            <div class="flex wrap">
               <code class="tiny">${esc(e.qr_token)}</code>
               <button class="btn sm outline" id="btn-qr">${icons.qr} Régénérer</button>
-              <button class="btn sm dark" id="btn-print">${icons.print} Imprimer le badge</button>
             </div>
+            <div class="flex wrap mt-2">
+              <a class="btn sm primary" href="/api/employees/${e.id}/badge.png?dl=1" download="badge-${esc(e.matricule)}.png">${icons.download} Télécharger PNG</a>
+              <a class="btn sm outline" href="/api/employees/${e.id}/badge.svg?dl=1" download="badge-${esc(e.matricule)}.svg">${icons.download} SVG</a>
+              <button class="btn sm dark" id="btn-print">${icons.print} Imprimer la carte</button>
+            </div>
+            <div class="tiny muted mt-2">QR réellement scannable : placez le PNG téléchargé sur la carte de l’employé, il fonctionnera directement sur la borne.</div>
           </div>
           <div>
             <div class="badge-print print-area" id="badge-area">

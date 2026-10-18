@@ -34,7 +34,7 @@ des **majorations** (nuit, dimanche/jour férié, heures supplémentaires) et de
 | Au-delà de **40 h/semaine** : 8 premières heures supplémentaires | **+15 %** |
 | Le reste des heures supplémentaires | **+40 %** |
 | **32 h.sup./mois** maximum à +15 % (4 semaines × 8 h), le reste | **+40 %** |
-| Journée ≥ **10 h** ou comportant des heures de nuit | **panier repas** (2 500 FCFA par défaut) |
+| Journée ≥ **10 h** ou comportant des heures de nuit | **panier compté** (1, 2, 3…) — jamais converti en FCFA |
 | Chaque **jour férié** non travaillé | payé **8 h** |
 
 - Taux horaire = salaire mensuel ÷ **173,33 h** (40 h × 52 ÷ 12)
@@ -44,7 +44,8 @@ des **majorations** (nuit, dimanche/jour férié, heures supplémentaires) et de
 
 ### 📊 Modules
 - **Tableau de bord** temps réel (présents, absents, derniers pointages)
-- **Employés** : fiche complète, **badge QR imprimable**, enrôlement d'empreinte
+- **Employés** : fiche complète, **badge QR téléchargeable (PNG/SVG)** généré à la création,
+  imprimable pour la carte de l'employé, enrôlement d'empreinte
 - **Pointages** : registre par jour, ajouts/suppressions tracés
 - **Paie** : aperçu ligne par ligne, détail des primes, **bulletin imprimable**,
   génération/validation des bordereaux, enregistrement des paiements
@@ -58,7 +59,7 @@ des **majorations** (nuit, dimanche/jour férié, heures supplémentaires) et de
 ```bash
 npm install
 npm start          # → http://localhost:3000
-npm test           # 16 tests du moteur de paie
+npm test           # 19 tests : règles de paie + QR scannables
 ```
 
 Node.js ≥ 22 requis (SQLite natif `node:sqlite`, aucune compilation).

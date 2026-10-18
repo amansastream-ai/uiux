@@ -118,14 +118,18 @@ test('règle 5 bis : 5 semaines de dépassement → la 5e semaine sort du quota'
   assert.equal(r.hours.overtime_40, 68);
 });
 
-test('règle 6 : panier si journée ≥ 10 h', () => {
+test('règle 6 : panier compté (pas en FCFA) si journée ≥ 10 h', () => {
   const r = computePayroll({
     baseSalary: 173330,
     sessions: [{ start: '2026-10-12T08:00:00', end: '2026-10-12T18:30:00' }], // 10h30
-    holidays: none, rules: { panier_amount: 2500 }, ...period
+    holidays: none, rules: {}, ...period
   });
   assert.equal(r.paniers.count, 1);
-  assert.equal(r.paniers.amount, 2500);
+  // Le panier n'entre pas dans le brut : simple compteur 1, 2, 3…
+  assert.equal(r.gross, 173330);
+  const panier = r.lines.find((l) => l.code === 'PANIER');
+  assert.equal(panier.amount, 0);
+  assert.equal(panier.quantity, 1);
 });
 
 test('règle 6 bis : panier dès la moindre heure de nuit', () => {
