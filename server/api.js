@@ -24,6 +24,19 @@ function apiRouter(db) {
     return out;
   };
 
+  // ============================================================ SANTÉ (HEALTHCHECK)
+  router.get('/health', (req, res) => {
+    const users = db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
+    const employees = db.prepare('SELECT COUNT(*) AS n FROM employees').get().n;
+    res.json({
+      status: 'ok',
+      db: 'ok',
+      runtime: process.env.VERCEL ? 'vercel' : 'node',
+      users,
+      employees
+    });
+  });
+
   // ============================================================ AUTH
   router.post('/auth/login', (req, res) => {
     const { email, password } = req.body || {};
