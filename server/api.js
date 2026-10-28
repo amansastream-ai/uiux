@@ -178,35 +178,43 @@ function apiRouter(db) {
     res.json({ employees: rows });
   });
 
-  const employeeBody = (b) => ({
-    matricule: b.matricule,
-    first_name: b.first_name,
-    last_name: b.last_name,
-    email: b.email || null,
-    phone: b.phone || null,
-    department_id: b.department_id ? Number(b.department_id) : null,
-    position: b.position || '',
-    contract_type: b.contract_type || 'CDI',
-    hire_date: b.hire_date || null,
-    base_salary: Number(b.base_salary) || 0,
-    schedule_name: b.schedule_name || 'Jour',
-    schedule_start: b.schedule_start || '08:00',
-    schedule_end: b.schedule_end || '17:00',
-    status: b.status || 'actif'
-  });
+  const employeeBody = (b) => {
+    const scheduleName = b.schedule_name || 'Jour';
+    const defaultWeeklyHours = ['Nuit', 'Rotation 7j/7'].includes(scheduleName) ? 56 : 40;
+    return {
+      matricule: b.matricule,
+      first_name: b.first_name,
+      last_name: b.last_name,
+      email: b.email || null,
+      phone: b.phone || null,
+      department_id: b.department_id ? Number(b.department_id) : null,
+      position: b.position || '',
+      contract_type: b.contract_type || 'CDI',
+      hire_date: b.hire_date || null,
+      base_salary: Number(b.base_salary) || 0,
+      weekly_hours: b.weekly_hours == null || b.weekly_hours === '' ? defaultWeeklyHours : Number(b.weekly_hours),
+      schedule_name: scheduleName,
+      schedule_start: b.schedule_start || '08:00',
+      schedule_end: b.schedule_end || '17:00',
+      status: b.status || 'actif'
+    };
+  };
+
+  const hasValidWeeklyHours = (employee) => [40, 56].includes(employee.weekly_hours);
 
   router.post('/employees', auth, requireRole('admin', 'drh'), (req, res) => {
     const e = employeeBody(req.body || {});
     if (!e.matricule || !e.first_name || !e.last_name) return res.status(400).json({ error: 'Matricule, prénom et nom obligatoires' });
+    if (!hasValidWeeklyHours(e)) return res.status(400).json({ error: 'La référence hebdomadaire doit être de 40 h ou 56 h' });
     const qr = 'QR-' + crypto.randomBytes(6).toString('hex').toUpperCase();
     const fp = 'FP-' + crypto.randomBytes(8).toString('hex').toUpperCase();
     try {
       const info = db.prepare(`INSERT INTO employees
         (matricule, first_name, last_name, email, phone, department_id, position, contract_type, hire_date,
-         base_salary, schedule_name, schedule_start, schedule_end, status, qr_token, fingerprint_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+         base_salary, weekly_hours, schedule_name, schedule_start, schedule_end, status, qr_token, fingerprint_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(e.matricule, e.first_name, e.last_name, e.email, e.phone, e.department_id, e.position,
-          e.contract_type, e.hire_date, e.base_salary, e.schedule_name, e.schedule_start, e.schedule_end,
+          e.contract_type, e.hire_date, e.base_salary, e.weekly_hours, e.schedule_name, e.schedule_start, e.schedule_end,
           e.status, qr, fp);
       audit(db, req.user, 'employé créé', `${e.matricule} ${e.first_name} ${e.last_name}`);
       const created = db.prepare('SELECT * FROM employees WHERE id = ?').get(info.lastInsertRowid);
@@ -220,11 +228,12 @@ function apiRouter(db) {
     const e = employeeBody(req.body || {});
     const exists = db.prepare('SELECT id FROM employees WHERE id = ?').get(req.params.id);
     if (!exists) return res.status(404).json({ error: 'Employé introuvable' });
+    if (!hasValidWeeklyHours(e)) return res.status(400).json({ error: 'La référence hebdomadaire doit être de 40 h ou 56 h' });
     db.prepare(`UPDATE employees SET matricule=?, first_name=?, last_name=?, email=?, phone=?, department_id=?,
-      position=?, contract_type=?, hire_date=?, base_salary=?, schedule_name=?, schedule_start=?, schedule_end=?, status=?
+      position=?, contract_type=?, hire_date=?, base_salary=?, weekly_hours=?, schedule_name=?, schedule_start=?, schedule_end=?, status=?
       WHERE id=?`)
       .run(e.matricule, e.first_name, e.last_name, e.email, e.phone, e.department_id, e.position,
-        e.contract_type, e.hire_date, e.base_salary, e.schedule_name, e.schedule_start, e.schedule_end, e.status, req.params.id);
+        e.contract_type, e.hire_date, e.base_salary, e.weekly_hours, e.schedule_name, e.schedule_start, e.schedule_end, e.status, req.params.id);
     audit(db, req.user, 'employé modifié', `${e.matricule} ${e.first_name} ${e.last_name}`);
     res.json({ employee: db.prepare('SELECT * FROM employees WHERE id = ?').get(req.params.id) });
   });
@@ -446,13 +455,14 @@ function apiRouter(db) {
 
     const results = emps.map((e) => {
       const mine = sessions.filter((s) => s.employee_id === e.id);
-      const pay = computePayroll({ sessions: mine, holidays, rules, baseSalary: e.base_salary, periodFrom: from, periodTo: to });
+      const pay = computePayroll({ sessions: mine, holidays, rules, baseSalary: e.base_salary, weeklyHours: e.weekly_hours, periodFrom: from, periodTo: to });
       const deductions = computeDeductions(pay.gross, rules);
       const totalDed = deductions.reduce((a, d) => a + d.amount, 0);
       return {
         employee: {
           id: e.id, matricule: e.matricule, first_name: e.first_name, last_name: e.last_name,
-          position: e.position, department: e.department, base_salary: e.base_salary
+          position: e.position, department: e.department, base_salary: e.base_salary,
+          weekly_hours: e.weekly_hours, monthly_hours: e.weekly_hours * 4
         },
         hours: pay.hours, paniers: pay.paniers, lines: pay.lines,
         holidays_credited: pay.holidays_credited,
@@ -488,14 +498,14 @@ function apiRouter(db) {
       let tg = 0, tn = 0;
       for (const e of emps) {
         const mine = sessions.filter((s) => s.employee_id === e.id);
-        const pay = computePayroll({ sessions: mine, holidays, rules, baseSalary: e.base_salary, periodFrom: from, periodTo: to });
+        const pay = computePayroll({ sessions: mine, holidays, rules, baseSalary: e.base_salary, weeklyHours: e.weekly_hours, periodFrom: from, periodTo: to });
         const deductions = computeDeductions(pay.gross, rules);
         const totalDed = deductions.reduce((a, d) => a + d.amount, 0);
         const net = pay.gross - totalDed;
         tg += pay.gross; tn += net;
-        db.prepare(`INSERT INTO payroll_items(run_id, employee_id, base_salary, hours_json, lines_json, gross, deductions_json, net, paniers)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-          .run(runId, e.id, e.base_salary, JSON.stringify(pay.hours), JSON.stringify(pay.lines),
+        db.prepare(`INSERT INTO payroll_items(run_id, employee_id, base_salary, weekly_hours, hours_json, lines_json, gross, deductions_json, net, paniers)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+          .run(runId, e.id, e.base_salary, e.weekly_hours, JSON.stringify(pay.hours), JSON.stringify(pay.lines),
             pay.gross, JSON.stringify(deductions), net, pay.paniers.count);
       }
       db.prepare('UPDATE payroll_runs SET total_gross=?, total_net=? WHERE id=?').run(tg, tn, runId);
@@ -561,12 +571,14 @@ function apiRouter(db) {
     const sessions = sessionsFor(from, to);
     const rows = emps.map((e) => {
       const mine = sessions.filter((s) => s.employee_id === e.id);
-      const pay = computePayroll({ sessions: mine, holidays, rules, baseSalary: e.base_salary, periodFrom: from, periodTo: to });
+      const pay = computePayroll({ sessions: mine, holidays, rules, baseSalary: e.base_salary, weeklyHours: e.weekly_hours, periodFrom: from, periodTo: to });
       return {
         matricule: e.matricule,
         name: `${e.first_name} ${e.last_name}`,
         department: e.department,
         schedule: e.schedule_name,
+        weekly_hours: e.weekly_hours,
+        monthly_hours: e.weekly_hours * 4,
         hours: pay.hours,
         paniers: pay.paniers.count
       };
@@ -582,22 +594,23 @@ function apiRouter(db) {
     const holidays = db.prepare('SELECT * FROM holidays').all();
     const emps = db.prepare(`SELECT e.*, d.name AS department FROM employees e LEFT JOIN departments d ON d.id=e.department_id WHERE e.status='actif' ORDER BY e.matricule`).all();
     const sessions = sessionsFor(from, to);
-    const lines = ['Matricule;Nom;Département;Heures totales;Heures nuit;Dimanche/Férié;H.sup 15%;H.sup 40%;Paniers;Brut FCFA;Net FCFA'];
+    const lines = ['Matricule;Nom;Département;Référence hebdomadaire;Référence mensuelle;Heures totales;Heures nuit;Dimanche/Férié;H.sup 15%;H.sup 40%;Paniers;Brut FCFA;Net FCFA'];
     let tg = 0, tn = 0;
     for (const e of emps) {
       const mine = sessions.filter((s) => s.employee_id === e.id);
-      const pay = computePayroll({ sessions: mine, holidays, rules, baseSalary: e.base_salary, periodFrom: from, periodTo: to });
+      const pay = computePayroll({ sessions: mine, holidays, rules, baseSalary: e.base_salary, weeklyHours: e.weekly_hours, periodFrom: from, periodTo: to });
       const deductions = computeDeductions(pay.gross, rules);
       const net = pay.gross - deductions.reduce((a, d) => a + d.amount, 0);
       tg += pay.gross; tn += net;
       lines.push([
         e.matricule, `${e.first_name} ${e.last_name}`, e.department || '',
+        e.weekly_hours, e.weekly_hours * 4,
         pay.hours.total, pay.hours.night, (pay.hours.rest_day + pay.hours.rest_night),
         pay.hours.overtime_15, pay.hours.overtime_40, pay.paniers.count, pay.gross, net
       ].join(';'));
     }
     lines.push('');
-    lines.push(`TOTAL;;;;;;;${''};;;;${tg};${tn}`);
+    lines.push(['TOTAL', '', '', '', '', '', '', '', '', '', '', tg, tn].join(';'));
     res.type('text/csv; charset=utf-8')
       .setHeader('Content-Disposition', `attachment; filename="paie-chronorh-${period}.csv"`)
       .send('\uFEFF' + lines.join('\r\n'));

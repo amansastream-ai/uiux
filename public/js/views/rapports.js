@@ -83,7 +83,7 @@ export async function renderRapports(el, ctx) {
           <tr>
             <td>${personCell(r.name.split(' ')[0], r.name.split(' ').slice(1).join(' '), r.matricule)}</td>
             <td>${esc(r.department || '—')}</td>
-            <td class="small">${esc(r.schedule)}</td>
+            <td class="small">${esc(r.schedule)}<br/><span class="muted">${r.weekly_hours} h/sem. · ${r.monthly_hours} h/mois</span></td>
             <td class="num b">${num(r.hours.total)}</td>
             <td class="num">${num(r.hours.night)}</td>
             <td class="num">${num(r.hours.rest_day + r.hours.rest_night)}</td>

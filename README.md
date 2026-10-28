@@ -36,16 +36,16 @@ démonstration sont conservés.
 | Travail de nuit (**22h → 5h**) | **+60 %** |
 | Travail le **dimanche** ou un **jour férié** | **+60 %** sur toutes les heures |
 | **Dimanche/férié de nuit** (22h → 5h) | **+100 %** |
-| Au-delà de **40 h/semaine** : 8 premières heures supplémentaires | **+15 %** |
+| Au-delà du seuil de référence individuel (**40 ou 56 h/semaine**) : 8 premières heures supplémentaires | **+15 %** |
 | Le reste des heures supplémentaires | **+40 %** |
-| **32 h.sup./mois** maximum à +15 % (4 semaines × 8 h), le reste | **+40 %** |
+| **40 h.sup./mois** maximum à +15 %, le reste | **+40 %** |
 | Journée ≥ **10 h** ou comportant des heures de nuit | **panier compté** (1, 2, 3…) — jamais converti en FCFA |
 | Chaque **jour férié** non travaillé | payé **8 h** |
 
-- Les heures supplémentaires (**+15 %**, **+40 %**) et majorations (nuit **+60 %**, dimanche/férié **+60 %**, nuit fériée **+100 %**) sont calculées directement sur le **salaire de base mensuel**, sur une base de **40 h/semaine**.
+- Chaque employé a une référence configurable de **40 h/semaine (160 h/mois)** ou **56 h/semaine (224 h/mois)**. Son seuil d’heures supplémentaires et la base horaire de calcul des primes suivent cette référence.
+- Les taux restent inchangés : h.sup. **+15 % / +40 %**, nuit **+60 %**, dimanche/férié **+60 %**, nuit fériée **+100 %**. Le quota mensuel des premières heures supplémentaires est de **40 h à +15 %**.
 - Cotisations salariales par défaut : **IPRES 5,6 %** + **CSS 5 %** (configurables)
-- Toutes les valeurs sont **paramétrables** dans *Paramètres → Règles de paie*,
-  avec un **simulateur** en temps réel.
+- Les taux restent **paramétrables** dans *Paramètres → Règles de paie* avec un **simulateur** ; la référence hebdomadaire se règle dans la fiche employé.
 
 ### 📊 Modules
 - **Tableau de bord** temps réel (présents, absents, derniers pointages)
@@ -64,7 +64,7 @@ démonstration sont conservés.
 ```bash
 npm install
 npm start          # → http://localhost:3000
-npm test           # 24 tests : règles de paie + QR scannables + serverless Vercel
+npm test           # 28 tests : règles de paie + QR scannables + serverless Vercel
 ```
 
 Node.js ≥ 22 requis (SQLite natif `node:sqlite`, aucune compilation).
@@ -78,7 +78,7 @@ Node.js ≥ 22 requis (SQLite natif `node:sqlite`, aucune compilation).
 | Comptable | `compta@sahelservices.sn` | `demo2026` |
 | Pointeur | `pointage@sahelservices.sn` | `demo2026` |
 
-Le jeu de démonstration contient **12 employés** (jour, nuit, rotation 7j/7),
+Le jeu de démonstration contient **12 employés** (EMP-001 à EMP-008 : 40 h/semaine ; EMP-009 à EMP-012 : 56 h/semaine),
 les pointages de **septembre & octobre 2026**, les **jours fériés du Sénégal**,
 et un bordereau de paie de septembre validé avec paiements (Wave, virement).
 
@@ -122,9 +122,9 @@ public/
   css/          Design system (tokens + composants)
   js/views/     Vues SPA : dashboard, employés, pointages, borne, paie…
 tests/
-  payroll.test.js   17 tests des règles de paie (node:test)
+  payroll.test.js   19 tests des règles de paie (node:test)
   qr.test.js        3 tests de génération/décodage QR
-  vercel.test.js    4 tests de compatibilité serverless Vercel
+  vercel.test.js    6 tests de compatibilité et migrations Vercel/API
 vercel.json     Routage Vercel (/api/* → fonction serverless, SPA fallback)
 ```
 

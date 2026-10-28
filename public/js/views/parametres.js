@@ -65,7 +65,7 @@ export async function renderParametres(el, ctx) {
       <div class="grid cols-2">
         <div class="card pad">
           <h3 class="mb-2">Barème des majorations &amp; primes</h3>
-          <p class="small muted mb-4">Les heures supplémentaires (+15 % / +40 %) et les majorations (nuit +60 %, dimanche/férié +60 %, nuit fériée +100 %) sont calculées directement sur le salaire de base mensuel — base 40 h/semaine.</p>
+          <p class="small muted mb-4">Chaque salarié a sa référence hebdomadaire : 40 h (160 h/mois) ou 56 h (224 h/mois). Le seuil d’heures supplémentaires et la base des primes suivent cette référence individuelle ; les taux ci-dessous restent inchangés.</p>
           <form id="r-form" class="form-grid">
             <div class="field"><label>🌙 Majoration nuit 22h→5h (%)</label>
               <input class="input" name="night_premium_pct" type="number" value="${R('night_premium_pct', 60)}" /></div>
@@ -73,14 +73,14 @@ export async function renderParametres(el, ctx) {
               <input class="input" name="rest_day_premium_pct" type="number" value="${R('rest_day_premium_pct', 60)}" /></div>
             <div class="field"><label>🌌 Nuit dimanche / férié 22h→5h (%)</label>
               <input class="input" name="rest_night_premium_pct" type="number" value="${R('rest_night_premium_pct', 100)}" /></div>
-            <div class="field"><label>Seuil d’heures supplémentaires par semaine (h)</label>
-              <input class="input" name="week_base_hours" type="number" value="${R('week_base_hours', 40)}" /></div>
+            <div class="field"><label>Seuil hebdomadaire</label>
+              <input class="input" value="Selon la durée de référence de chaque salarié" disabled /></div>
             <div class="field"><label>⏱️ 1res heures sup./semaine à +15 % (h)</label>
               <input class="input" name="ot_week_first_hours" type="number" value="${R('ot_week_first_hours', 8)}" /></div>
             <div class="field"><label>Taux 1res heures sup. (%)</label>
               <input class="input" name="ot_week_first_pct" type="number" value="${R('ot_week_first_pct', 15)}" /></div>
             <div class="field"><label>📅 Quota mensuel d’h.sup. à +15 % (h)</label>
-              <input class="input" name="ot_month_quota_hours" type="number" value="${R('ot_month_quota_hours', 32)}" /></div>
+              <input class="input" name="ot_month_quota_hours" type="number" value="${R('ot_month_quota_hours', 40)}" /></div>
             <div class="field"><label>Taux du reste des h.sup. (%)</label>
               <input class="input" name="ot_rest_pct" type="number" value="${R('ot_rest_pct', 40)}" /></div>
             <div class="field"><label>🧺 Panier si journée ≥ (h)</label>
@@ -112,6 +112,11 @@ export async function renderParametres(el, ctx) {
             <div class="form-grid">
               <div class="field"><label>Salaire mensuel (FCFA)</label>
                 <input class="input" id="sim-salary" type="number" value="260000" /></div>
+              <div class="field"><label>Référence hebdomadaire</label>
+                <select class="input" id="sim-weekly-hours">
+                  <option value="40">40 h/semaine · 160 h/mois</option>
+                  <option value="56">56 h/semaine · 224 h/mois</option>
+                </select></div>
               <div class="field"><label>Heures travaillées</label>
                 <input class="input" id="sim-hours" type="number" value="10" /></div>
               <div class="field"><label>Scénario</label>
@@ -131,12 +136,12 @@ export async function renderParametres(el, ctx) {
           <div class="card pad">
             <h3 class="mb-2">📌 Rappel de la convention</h3>
             <ul class="small muted" style="line-height:2;padding-left:18px;margin:0">
-              <li>Les heures supplémentaires (+15 % / +40 %) et majorations (nuit +60 %, dimanche/férié +60 %, nuit fériée +100 %) sont calculées directement sur le salaire de base mensuel — base <b>40 h/semaine</b>.</li>
+              <li>Le seuil et la base de calcul suivent la référence individuelle : <b>40 h/semaine (160 h/mois)</b> ou <b>56 h/semaine (224 h/mois)</b>.</li>
               <li>Travail de <b>22h à 5h</b> → majoration <b>60 %</b></li>
               <li>Travail le <b>dimanche</b> ou un <b>jour férié</b> → toutes les heures à <b>+60 %</b></li>
               <li><b>Dimanche/férié de nuit</b> (22h→5h) → majoration <b>100 %</b></li>
-              <li>Au-delà de <b>40 h/semaine</b> : les <b>8 premières h.sup.</b> à <b>+15 %</b>, le reste à <b>+40 %</b></li>
-              <li><b>32 h.sup./mois</b> maximum à +15 % (4 semaines × 8 h), le reste à <b>+40 %</b></li>
+              <li>Au-delà du seuil individuel de <b>40 h ou 56 h/semaine</b> : les <b>8 premières h.sup.</b> à <b>+15 %</b>, le reste à <b>+40 %</b></li>
+              <li><b>40 h.sup./mois</b> maximum à +15 %, le reste à <b>+40 %</b></li>
               <li><b>Panier</b> si la journée atteint <b>10 h</b> ou comporte des heures de <b>nuit</b> — simple compteur (1, 2, 3…)</li>
               <li>Chaque <b>jour férié</b> non travaillé est payé <b>8 h</b></li>
             </ul>
@@ -148,7 +153,8 @@ export async function renderParametres(el, ctx) {
       const salary = Number(content.querySelector('#sim-salary').value) || 0;
       const hours = Number(content.querySelector('#sim-hours').value) || 0;
       const sc = content.querySelector('#sim-scenario').value;
-      const monthlyBaseHours = 40 * 52 / 12;
+      const weeklyHours = Number(content.querySelector('#sim-weekly-hours').value) || 40;
+      const monthlyBaseHours = weeklyHours * 4;
       const pct = sc === 'night' ? Number(R('night_premium_pct', 60)) :
         sc === 'sunday' ? Number(R('rest_day_premium_pct', 60)) :
         sc === 'sundaynight' ? Number(R('rest_night_premium_pct', 100)) :
@@ -159,14 +165,14 @@ export async function renderParametres(el, ctx) {
       const panier = (hours >= Number(R('panier_min_hours', 10)) || sc === 'night' || sc === 'sundaynight') ? 1 : 0;
       content.querySelector('#sim-panier').value = panier ? '1 panier (compté)' : '0 panier';
       content.querySelector('#sim-out').innerHTML = `
-        <div class="stat-line"><span class="lbl">Base de calcul</span><span class="val">Salaire mensuel · 40 h/semaine</span></div>
+        <div class="stat-line"><span class="lbl">Base de calcul</span><span class="val">Salaire mensuel · ${weeklyHours} h/semaine · ${monthlyBaseHours} h/mois</span></div>
         <div class="stat-line"><span class="lbl">Majoration appliquée</span><span class="val">+${pct} %</span></div>
         <div class="stat-line"><span class="lbl">Montant des heures</span><span class="val">${fcfa(amount)}</span></div>
         <div class="stat-line"><span class="lbl">dont majoration</span><span class="val" style="color:var(--gold-600)">${fcfa(premium)}</span></div>
         <div class="stat-line"><span class="lbl">Paniers</span><span class="val">${panier ? '1' : '0'}</span></div>
         <div class="stat-line"><span class="lbl"><b>Total brut simulé</b></span><span class="val" style="font-size:16px">${fcfa(amount)}</span></div>`;
     };
-    ['#sim-salary', '#sim-hours', '#sim-scenario'].forEach((s) =>
+    ['#sim-salary', '#sim-hours', '#sim-scenario', '#sim-weekly-hours'].forEach((s) =>
       content.querySelector(s).addEventListener('input', sim));
     sim();
 
