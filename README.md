@@ -36,13 +36,13 @@ démonstration sont conservés.
 | Travail de nuit (**22h → 5h**) | **+60 %** |
 | Travail le **dimanche** ou un **jour férié** | **+60 %** sur toutes les heures |
 | **Dimanche/férié de nuit** (22h → 5h) | **+100 %** |
-| Au-delà du seuil de référence individuel (**40 ou 56 h/semaine**) : 8 premières heures supplémentaires | **+15 %** |
-| Le reste des heures supplémentaires | **+40 %** |
+| Heures au-delà du seuil individuel (**40 ou 56 h/semaine**) : 8 premières heures, payables seulement si le total mensuel dépasse **160 ou 224 h** | **+15 %** |
+| Le reste des heures supplémentaires payables | **+40 %** |
 | **40 h.sup./mois** maximum à +15 %, le reste | **+40 %** |
 | Journée ≥ **10 h** ou comportant des heures de nuit | **panier compté** (1, 2, 3…) — jamais converti en FCFA |
 | Chaque **jour férié** non travaillé | payé **8 h** |
 
-- Chaque employé a une référence configurable de **40 h/semaine (160 h/mois)** ou **56 h/semaine (224 h/mois)**. Son seuil d’heures supplémentaires et la base horaire de calcul des primes suivent cette référence.
+- Chaque employé a une référence configurable de **40 h/semaine (160 h/mois)** ou **56 h/semaine (224 h/mois)**; la base horaire des primes suit cette référence. Le dépassement hebdomadaire détermine les h.sup. candidates, mais les h.sup. payées sont limitées à l’excédent mensuel au-delà de **160/224 h** : aucune h.sup. n’est payée si le total mensuel est inférieur ou égal à la référence, même si une semaine isolée la dépasse.
 - Les taux restent inchangés : h.sup. **+15 % / +40 %**, nuit **+60 %**, dimanche/férié **+60 %**, nuit fériée **+100 %**. Le quota mensuel des premières heures supplémentaires est de **40 h à +15 %**.
 - Cotisations salariales par défaut : **IPRES 5,6 %** + **CSS 5 %** (configurables)
 - Les taux restent **paramétrables** dans *Paramètres → Règles de paie* avec un **simulateur** ; la référence hebdomadaire se règle dans la fiche employé.
@@ -64,7 +64,7 @@ démonstration sont conservés.
 ```bash
 npm install
 npm start          # → http://localhost:3000
-npm test           # 28 tests : règles de paie + QR scannables + serverless Vercel
+npm test           # règles de paie, seeds/migrations, QR scannables et serverless Vercel
 ```
 
 Node.js ≥ 22 requis (SQLite natif `node:sqlite`, aucune compilation).

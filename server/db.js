@@ -9,7 +9,7 @@ const crypto = require('node:crypto');
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
-const { DEFAULT_RULES } = require('./payroll');
+const { DEFAULT_RULES, isoWeekKey } = require('./payroll');
 
 function isServerlessEnv() {
   return Boolean(
@@ -180,6 +180,77 @@ function schema(db) {
   }
 }
 
+const DEMO_ATTENDANCE_VERSION = '2';
+// SHA-256 of the untouched v1 demo attendance table. Migrate only this exact fixture.
+const LEGACY_DEMO_ATTENDANCE_SHA256 = '575d95534233591291793599cce41f252bba5ef30a2287d89205cc11f0b0554f';
+const DEFAULT_DEMO_USERS = [
+  ['admin@sahelservices.sn', 'admin'],
+  ['compta@sahelservices.sn', 'comptable'],
+  ['drh@sahelservices.sn', 'drh'],
+  ['pointage@sahelservices.sn', 'pointage']
+];
+const DEFAULT_DEMO_SCHEDULES = [
+  ['EMP-001', 40, 'Jour', '08:00', '17:00'],
+  ['EMP-002', 40, 'Jour', '08:00', '17:00'],
+  ['EMP-003', 40, 'Jour', '08:00', '17:00'],
+  ['EMP-004', 40, 'Jour', '08:00', '17:00'],
+  ['EMP-005', 40, 'Jour', '08:00', '17:00'],
+  ['EMP-006', 40, 'Équipe jour', '07:00', '16:00'],
+  ['EMP-007', 40, 'Équipe jour', '07:00', '16:00'],
+  ['EMP-008', 40, 'Jour', '08:00', '17:00'],
+  ['EMP-009', 56, 'Nuit', '22:00', '06:00'],
+  ['EMP-010', 56, 'Nuit', '22:00', '06:00'],
+  ['EMP-011', 56, 'Rotation 7j/7', '06:00', '14:00'],
+  ['EMP-012', 56, 'Rotation 7j/7', '14:00', '22:00']
+];
+
+function attendanceFingerprint(db) {
+  const rows = db.prepare(`SELECT employee_id, type, ts, method, device, note, created_by
+    FROM attendance ORDER BY id`).all();
+  const canonical = rows.map((row) => ({
+    employee_id: row.employee_id, type: row.type, ts: row.ts,
+    method: row.method, device: row.device, note: row.note, created_by: row.created_by
+  }));
+  return crypto.createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+}
+
+function isUntouchedLegacyDemo(db) {
+  const users = db.prepare('SELECT email, role FROM users ORDER BY email').all();
+  if (JSON.stringify(users.map((user) => [user.email, user.role])) !== JSON.stringify(DEFAULT_DEMO_USERS)) return false;
+  const company = db.prepare("SELECT value FROM settings WHERE key = 'company_name'").get();
+  if (!company || company.value !== 'Sahel Services SARL') return false;
+  const employees = db.prepare(`SELECT matricule, weekly_hours, schedule_name, schedule_start, schedule_end
+    FROM employees ORDER BY matricule`).all();
+  const schedules = employees.map((employee) => [
+    employee.matricule, employee.weekly_hours, employee.schedule_name,
+    employee.schedule_start, employee.schedule_end
+  ]);
+  if (JSON.stringify(schedules) !== JSON.stringify(DEFAULT_DEMO_SCHEDULES)) return false;
+  return attendanceFingerprint(db) === LEGACY_DEMO_ATTENDANCE_SHA256;
+}
+
+function migrateLegacyDemoAttendance(db) {
+  const existingVersion = db.prepare("SELECT value FROM settings WHERE key = 'demo_attendance_version'").get();
+  if (existingVersion && existingVersion.value === DEMO_ATTENDANCE_VERSION) return false;
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const version = db.prepare("SELECT value FROM settings WHERE key = 'demo_attendance_version'").get();
+    if ((version && version.value === DEMO_ATTENDANCE_VERSION) || !isUntouchedLegacyDemo(db)) {
+      db.exec('COMMIT');
+      return false;
+    }
+    db.exec('DELETE FROM attendance');
+    seedAttendance(db);
+    db.prepare('INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)')
+      .run('demo_attendance_version', DEMO_ATTENDANCE_VERSION);
+    db.exec('COMMIT');
+    return true;
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch { /* ignore */ }
+    throw err;
+  }
+}
+
 function seed(db) {
   const userCount = db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
   const empCount = db.prepare('SELECT COUNT(*) AS n FROM employees').get().n;
@@ -188,6 +259,7 @@ function seed(db) {
     if (!quota || Number(quota.value) === 32) {
       db.prepare("INSERT OR REPLACE INTO pay_rules(key, value) VALUES ('ot_month_quota_hours', '40')").run();
     }
+    migrateLegacyDemoAttendance(db);
     return false;
   }
 
@@ -206,6 +278,7 @@ function seed(db) {
   set.run('timezone', 'Africa/Dakar');
   set.run('device_name', 'Tablette-Pointage-01');
   set.run('subscription', 'Premium — illimité');
+  set.run('demo_attendance_version', DEMO_ATTENDANCE_VERSION);
 
   // ---------- Règles de paie ----------
   const rule = db.prepare('INSERT OR REPLACE INTO pay_rules(key, value) VALUES (?, ?)');
@@ -288,84 +361,117 @@ function seed(db) {
 
 function seedAttendance(db) {
   const att = db.prepare('INSERT INTO attendance(employee_id, type, ts, method, device, note) VALUES (?, ?, ?, ?, ?, ?)');
-  const getEmp = db.prepare('SELECT * FROM employees ORDER BY id');
-  const emps = getEmp.all();
-
-  // Tirage pseudo-aléatoire déterministe
-  let seedn = 42;
-  const rnd = () => (seedn = (seedn * 1103515245 + 12345) % 2147483648) / 2147483648;
-
-  const push = (empId, type, dateStr, timeStr, method) =>
-    att.run(empId, type, `${dateStr}T${timeStr}:00`, method || (rnd() > 0.4 ? 'qr' : 'fingerprint'), 'Tablette-Pointage-01', null);
-
-  const eachDate = (from, to, cb) => {
-    const d = new Date(from + 'T12:00:00');
-    const end = new Date(to + 'T12:00:00');
-    while (d <= end) {
-      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      cb(iso, d.getDay(), d);
-      d.setDate(d.getDate() + 1);
-    }
-  };
-
-  // Septembre 2026 (complet) + octobre 2026 jusqu'au 17
-  eachDate('2026-09-01', '2026-10-17', (iso, dow) => {
-    for (const e of emps) {
-      const id = Number(e.id);
-      const dep = Number(e.department_id);
-      const absent = rnd() < 0.04;
-      if (absent) continue;
-
-      if (e.schedule_name === 'Nuit') {
-        // Équipe de nuit : 22h → 06h (enregistré la veille au soir pour l'arrivée)
-        // On représente l'arrivée le jour même 22h et la sortie lendemain 6h —
-        // sauf samedi/dimanche : rotation normale.
-        push(id, 'in', iso, '21:58');
-        push(id, 'out', iso, '06:02'); // sera décalé au lendemain ci-dessous
-      } else if (e.schedule_name === 'Rotation 7j/7') {
-        if (dep === 5 && id === 11) {
-          // Mamadou : matin 6h→14h, y compris dimanches
-          push(id, 'in', iso, '05:57');
-          push(id, 'out', iso, '14:05');
-        } else {
-          // Ndeye : après-midi 14h→22h
-          push(id, 'in', iso, '13:58');
-          push(id, 'out', iso, '22:04');
-        }
-      } else {
-        // Équipe de jour — lundi→vendredi (+ samedi parfois pour production)
-        const worksSaturday = dep === 2 && id !== 4 && rnd() > 0.55;
-        const isSunday = dow === 0;
-        if (isSunday) continue;
-        if (dow === 6 && !worksSaturday) continue;
-        const late = rnd() < 0.08;
-        const startMin = e.schedule_start === '07:00' ? '07:0' : '08:0';
-        push(id, 'in', iso, late ? (e.schedule_start === '07:00' ? '07:22' : '08:19') : (e.schedule_start === '07:00' ? '06:58' : '07:58'));
-        // Fin : 17h05 standard ; vendredi 16h ; certains jours de grosse charge jusqu'à 20h
-        const heavy = rnd() < 0.18;
-        let outTime = '17:05';
-        if (dow === 5) outTime = '16:07';
-        if (worksSaturday && dow === 6) outTime = '13:10';
-        if (heavy) outTime = rnd() > 0.5 ? '20:12' : '19:35';
-        if (e.schedule_start === '07:00') outTime = heavy ? '18:40' : '16:08';
-        push(id, 'out', iso, outTime);
+  const emps = db.prepare('SELECT * FROM employees ORDER BY id').all();
+  // Four-week windows make the demo's 40/56 h weekly references exactly 160/224 h.
+  const monthPlans = [
+    {
+      month: '2026-09',
+      lastDay: 28,
+      employees: {
+        'EMP-001': { extraByWeek: [4] },
+        'EMP-002': { absentDays: 1 },
+        'EMP-005': { extraByWeek: [10] },
+        'EMP-007': { absentDays: 1, extraByWeek: [4] },
+        'EMP-008': { extraByWeek: [4] },
+        'EMP-009': { extraByWeek: [4] },
+        'EMP-010': { absentDays: 1 }
+      }
+    },
+    {
+      month: '2026-10',
+      lastDay: 28,
+      employees: {
+        'EMP-002': { absentDays: 1 },
+        'EMP-003': { extraByWeek: [4] },
+        'EMP-005': { extraByWeek: [10] },
+        'EMP-006': { absentDays: 1 },
+        'EMP-010': { extraByWeek: [4] },
+        'EMP-011': { absentDays: 1 }
       }
     }
-  });
+  ];
 
-  // Correction des nuits : sortie le lendemain 06:02 (format local, sans UTC)
-  const fix = db.prepare(`UPDATE attendance SET ts = ? WHERE id = ?`);
-  const nights = db.prepare(`SELECT id, ts FROM attendance WHERE employee_id IN (9,10) AND type='out' AND ts LIKE '%T06:02:00'`).all();
-  for (const n of nights) {
-    const d = new Date(n.ts);
-    d.setDate(d.getDate() + 1);
-    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    fix.run(`${iso}T06:02:00`, n.id);
+  const formatDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  const formatTime = (minutes) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+  const timeMinutes = (value) => {
+    const [hours, minutes] = String(value || '00:00').split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+  const dateTimeAt = (dateIso, minuteOffset) => {
+    const dayOffset = Math.floor(minuteOffset / 1440);
+    const minuteOfDay = ((minuteOffset % 1440) + 1440) % 1440;
+    const date = new Date(`${dateIso}T12:00:00`);
+    date.setDate(date.getDate() + dayOffset);
+    return `${formatDate(date)}T${formatTime(minuteOfDay)}:00`;
+  };
+  const pushAt = (employeeId, type, dateIso, minuteOffset, method) => {
+    att.run(employeeId, type, dateTimeAt(dateIso, minuteOffset), method, 'Tablette-Pointage-01', null);
+  };
+  const methodFor = (employeeId, dateIso, pointIndex) => {
+    const day = Number(dateIso.slice(-2));
+    return (employeeId + day + pointIndex) % 2 === 0 ? 'qr' : 'fingerprint';
+  };
+
+  for (const monthPlan of monthPlans) {
+    for (const employee of emps) {
+      const employeeId = Number(employee.id);
+      const weeklyHours = Number(employee.weekly_hours);
+      const workDates = [];
+      for (let day = 1; day <= monthPlan.lastDay; day++) {
+        const date = new Date(`${monthPlan.month}-01T12:00:00`);
+        date.setDate(day);
+        const dayOfWeek = date.getDay();
+        if (weeklyHours === 56 || (dayOfWeek >= 1 && dayOfWeek <= 5)) workDates.push(formatDate(date));
+      }
+
+      const plan = monthPlan.employees[employee.matricule] || {};
+      const absentDays = Number(plan.absentDays || 0);
+      if (absentDays > workDates.length) throw new Error(`Absences de démonstration invalides pour ${employee.matricule}`);
+      const absent = new Set(workDates.slice(0, absentDays));
+      const scheduledDates = workDates.filter((date) => !absent.has(date));
+      const datesPerFullWeek = weeklyHours === 56 ? 7 : 5;
+      const byWeek = new Map();
+      for (const date of scheduledDates) {
+        const week = isoWeekKey(new Date(`${date}T12:00:00`));
+        if (!byWeek.has(week)) byWeek.set(week, []);
+        byWeek.get(week).push(date);
+      }
+      const fullWeeks = [...byWeek.values()].filter((dates) => dates.length === datesPerFullWeek);
+      const extraMinutesByDate = new Map();
+      for (const [weekIndex, hours] of (plan.extraByWeek || []).entries()) {
+        const weekDates = fullWeeks[weekIndex];
+        if (!weekDates) throw new Error(`Semaine d’heures supplémentaires de démonstration absente pour ${employee.matricule}`);
+        let remaining = Number(hours) * 60;
+        for (const date of [...weekDates].reverse()) {
+          const extra = Math.min(remaining, 2 * 60);
+          if (extra > 0) extraMinutesByDate.set(date, extra);
+          remaining -= extra;
+          if (remaining === 0) break;
+        }
+        if (remaining > 0) throw new Error(`Heures supplémentaires de démonstration non distribuées pour ${employee.matricule}`);
+      }
+
+      for (const dateIso of scheduledDates) {
+        const start = timeMinutes(employee.schedule_start);
+        const extra = extraMinutesByDate.get(dateIso) || 0;
+        const dayOfMonth = Number(dateIso.slice(-2));
+        const late = (employeeId + dayOfMonth) % 11 === 0 ? 5 : 0;
+
+        if (weeklyHours === 56) {
+          let end = timeMinutes(employee.schedule_end);
+          if (end <= start) end += 1440;
+          pushAt(employeeId, 'in', dateIso, start + late, methodFor(employeeId, dateIso, 0));
+          pushAt(employeeId, 'out', dateIso, end + late + extra, methodFor(employeeId, dateIso, 1));
+        } else {
+          // Deux sessions séparées par une pause d’une heure : 8 h nettes.
+          pushAt(employeeId, 'in', dateIso, start + late, methodFor(employeeId, dateIso, 0));
+          pushAt(employeeId, 'out', dateIso, start + 4 * 60, methodFor(employeeId, dateIso, 1));
+          pushAt(employeeId, 'in', dateIso, start + 5 * 60, methodFor(employeeId, dateIso, 2));
+          pushAt(employeeId, 'out', dateIso, start + 9 * 60 + late + extra, methodFor(employeeId, dateIso, 3));
+        }
+      }
+    }
   }
-
-  // Quelques pointages manuels de correction (par la gestionnaire de pointage)
-  att.run(4, 'out', '2026-10-14T18:10:00', 'manual', 'Bureau', 'Correction : oubli de pointage de sortie');
-  att.run(7, 'in', '2026-09-23T07:15:00', 'manual', 'Bureau', 'Badge QR non reconnu, saisie manuelle');
 }
 
 module.exports = { open, schema, seed, hashPassword, verifyPassword, DB_PATH, resolveDbPath, isServerlessEnv };

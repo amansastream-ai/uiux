@@ -7,11 +7,11 @@
  *  1. Nuit (22h → 5h du matin) ..................... majoration 60 %
  *  2. Dimanche & jour férié (heures travaillées) .... majoration 60 %
  *  3. Dimanche / jour férié de nuit (22h → 5h) ...... majoration 100 %
- *  4. Seuil hebdomadaire propre à chaque employé (40 h ou 56 h) :
- *        les 8 premières heures supplémentaires ........ majoration 15 %
- *        le reste ...................................... majoration 40 %
- *  5. Quota mensuel : au plus 40 h.sup. peuvent bénéficier de +15 % ; le reste
- *     est majoré à 40 %.
+ *  4. Seuil hebdomadaire propre à chaque employé (40 h ou 56 h) : les h.sup.
+ *     sont candidates au-delà du seuil, mais payées seulement dans l'excédent
+ *     mensuel au-delà de 160 h ou 224 h.
+ *  5. Parmi les h.sup. payables, les 8 premières de chaque semaine sont à +15 %,
+ *     le reste à +40 %. Le quota mensuel à +15 % est de 40 h.
  *  6. Panier repas si la journée atteint 10 h de travail, OU contient
  *     des heures de nuit. Le panier est un COMPTEUR (1, 2, 3…) — il n'est
  *     jamais converti en francs CFA.
@@ -165,39 +165,50 @@ function computePayroll(opts) {
 
   const totalMinutes = totals.base + totals.night + totals.restDay + totals.restNight;
 
-  // ---- 2. Heures supplémentaires (seuil hebdomadaire salarié + quota mensuel 40h) ----
-  // Toutes les minutes (tous seaux confondus) comptent dans la durée du travail.
-  // Chronologie des minutes dépassant le seuil hebdomadaire :
-  const otEvents = []; // {ts, week}
+  // ---- 2. Heures supplémentaires : dépassement hebdomadaire ET mensuel ----
+  // Les heures ne sont candidates aux h.sup. qu'au-delà du seuil hebdomadaire
+  // individuel. Le total payé est ensuite plafonné à l'excédent positif sur la
+  // référence mensuelle (160 h ou 224 h) : à cette référence ou en dessous,
+  // aucune h.sup. n'est payée, même si une semaine isolée dépasse son seuil.
+  const otEvents = []; // {t, wk}
   for (const s of sessions) {
     let t = toMinutes(s.start);
     const end = toMinutes(s.end);
     for (; t < end; t++) {
       const wk = isoWeekKey(new Date(t * 60000));
-      // compte cumulé dans la semaine à cette minute
-      const when = new Date(t * 60000);
-      let weekSoFar = 0;
-      // recalcul incrémental simple : stocké progressivement
-      otEvents.push({ t, wk, when });
+      otEvents.push({ t, wk });
     }
   }
-  // Compte hebdo progressif dans l'ordre chronologique.
-  // Quota mensuel : 40 h maximum sont éligibles à la majoration de 15 %.
-  // Les heures supplémentaires restantes passent à 40 %.
-  const weekSeen = new Map();
-  let ot15 = 0, ot40 = 0, monthOt15 = 0;
+  otEvents.sort((a, b) => a.t - b.t);
+
   const weekThreshold = weeklyBaseHours * 60;
   const weekFirst = rules.ot_week_first_hours * 60;
   const monthQuota = rules.ot_month_quota_hours * 60;
+  const weekSeen = new Map();
+  let weeklyOvertimeMinutes = 0;
   for (const ev of otEvents) {
     const seen = (weekSeen.get(ev.wk) || 0) + 1;
     weekSeen.set(ev.wk, seen);
-    if (seen > weekThreshold) {
-      const inWeekFirst = (seen - weekThreshold) <= weekFirst;
-      const inMonthQuota = monthOt15 < monthQuota;
-      if (inWeekFirst && inMonthQuota) { ot15++; monthOt15++; }
-      else ot40++;
-    }
+    if (seen > weekThreshold) weeklyOvertimeMinutes++;
+  }
+
+  const monthlyExcessMinutes = Math.max(0, totalMinutes - monthlyBaseHours * 60);
+  const payableOvertimeMinutes = Math.min(weeklyOvertimeMinutes, monthlyExcessMinutes);
+  const weekSeenForPay = new Map();
+  const paidOvertimeByWeek = new Map();
+  let ot15 = 0, ot40 = 0, monthOt15 = 0, paidOvertimeMinutes = 0;
+  for (const ev of otEvents) {
+    const seen = (weekSeenForPay.get(ev.wk) || 0) + 1;
+    weekSeenForPay.set(ev.wk, seen);
+    if (seen <= weekThreshold || paidOvertimeMinutes >= payableOvertimeMinutes) continue;
+
+    paidOvertimeMinutes++;
+    const weekOvertime = (paidOvertimeByWeek.get(ev.wk) || 0) + 1;
+    paidOvertimeByWeek.set(ev.wk, weekOvertime);
+    const inWeekFirst = weekOvertime <= weekFirst;
+    const inMonthQuota = monthOt15 < monthQuota;
+    if (inWeekFirst && inMonthQuota) { ot15++; monthOt15++; }
+    else ot40++;
   }
 
   // ---- 3. Paniers (compteur : 1, 2, 3…) ----

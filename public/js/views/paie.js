@@ -14,7 +14,7 @@ export async function renderPaie(el, ctx) {
     <div class="page-head">
       <div>
         <h2>Paie &amp; salaires</h2>
-        <div class="sub">Les seuils et la base mensuelle des primes suivent la référence de chaque salarié : 40 h/semaine (160 h/mois) ou 56 h/semaine (224 h/mois). Quota mensuel d’h.sup. à +15 % : 40 h.</div>
+        <div class="sub">La base des primes et le seuil hebdomadaire suivent la référence individuelle : 160 h/mois (40 h/semaine) ou 224 h/mois (56 h/semaine). Les h.sup. ne sont payées que dans l’excédent au-delà de cette référence ; quota à +15 % : 40 h/mois.</div>
       </div>
       <div class="actions">
         <input class="input" type="month" id="pay-period" value="${period}" style="width:170px" />
@@ -32,11 +32,11 @@ export async function renderPaie(el, ctx) {
             <span class="rule-chip" style="background:rgba(255,255,255,.1);color:#DCE6F2">☀️ Dimanche / férié <b style="color:#F6D78A">+60 %</b></span>
             <span class="rule-chip" style="background:rgba(255,255,255,.1);color:#DCE6F2">🌌 Nuit dimanche/férié <b style="color:#F6D78A">+100 %</b></span>
             <span class="rule-chip" style="background:rgba(255,255,255,.1);color:#DCE6F2">⏱️ Seuil individuel 40/56 h/sem. · <b style="color:#8FD8BC">8 h à +15 %</b> puis <b style="color:#8FD8BC">+40 %</b></span>
-            <span class="rule-chip" style="background:rgba(255,255,255,.1);color:#DCE6F2">📅 Quota 40 h.sup./mois à +15 %</span>
+            <span class="rule-chip" style="background:rgba(255,255,255,.1);color:#DCE6F2">📅 H.sup. payables seulement au-delà de 160/224 h/mois · quota +15 % : 40 h</span>
             <span class="rule-chip" style="background:rgba(255,255,255,.1);color:#DCE6F2">🧺 Panier si ≥ 10 h ou nuit — <b style="color:#8FD8BC">compteur 1, 2, 3…</b></span>
             <span class="rule-chip" style="background:rgba(255,255,255,.1);color:#DCE6F2">🎉 Jour férié non travaillé = <b style="color:#F6D78A">8 h payées</b></span>
           </div>
-          <div class="tiny mt-2" style="color:#C8D5E4">Les primes sont calculées sur le salaire de base mensuel avec la référence individuelle de 160 ou 224 h/mois ; les taux restent inchangés.</div>
+          <div class="tiny mt-2" style="color:#C8D5E4">Aucune h.sup. n’est payée tant que le total mensuel ne dépasse pas la référence de 160 ou 224 h ; les taux restent inchangés.</div>
         </div>
         <div style="text-align:right">
           <div class="tiny" style="color:#9FB0C6">Période sélectionnée</div>
@@ -152,7 +152,7 @@ export async function renderPaie(el, ctx) {
             </tr>`).join('')}
         </tbody>
       </table></div>
-      <div class="tiny muted mt-4" style="padding:0 16px 12px">Cliquez sur une ligne pour voir le détail. Le seuil et la base mensuelle de chaque prime correspondent aux heures de référence indiquées pour le salarié.</div>`
+      <div class="tiny muted mt-4" style="padding:0 16px 12px">Cliquez sur une ligne pour voir le détail. Les h.sup. ne sont payées qu’au-delà du seuil hebdomadaire et de la référence mensuelle individuelle de 160/224 h.</div>`
       : emptyState('users', 'Aucun employé actif');
 
     el.querySelectorAll('.breakdown-row').forEach((row) => row.addEventListener('click', (e) => {
@@ -259,7 +259,7 @@ export async function renderPaie(el, ctx) {
           <div class="tiny muted mt-4">
             Heures : ${num(r.hours.total)} h au total — nuit ${num(r.hours.night)} h · dimanche/férié ${num(r.hours.rest_day + r.hours.rest_night)} h ·
             h.sup. ${num(r.hours.overtime_15 + r.hours.overtime_40)} h · paniers : ${r.paniers.count}.<br/>
-            Référence individuelle : ${r.employee.weekly_hours} h/semaine (${r.employee.monthly_hours} h/mois). Majorations inchangées : nuit +60 %, dimanche/férié +60 %, nuit fériée +100 %, h.sup. +15 % puis +40 % ; quota mensuel h.sup. à +15 % : 40 h.
+            Référence individuelle : ${r.employee.weekly_hours} h/semaine (${r.employee.monthly_hours} h/mois). Les h.sup. payables sont limitées à l’excédent mensuel au-delà de cette référence, après dépassement du seuil hebdomadaire. Majorations inchangées : nuit +60 %, dimanche/férié +60 %, nuit fériée +100 %, h.sup. +15 % puis +40 % ; quota mensuel h.sup. à +15 % : 40 h.
           </div>
         </div>`,
       footer: `<button class="btn outline" data-close>Fermer</button>

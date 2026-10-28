@@ -65,7 +65,7 @@ export async function renderParametres(el, ctx) {
       <div class="grid cols-2">
         <div class="card pad">
           <h3 class="mb-2">Barème des majorations &amp; primes</h3>
-          <p class="small muted mb-4">Chaque salarié a sa référence hebdomadaire : 40 h (160 h/mois) ou 56 h (224 h/mois). Le seuil d’heures supplémentaires et la base des primes suivent cette référence individuelle ; les taux ci-dessous restent inchangés.</p>
+          <p class="small muted mb-4">Chaque salarié a sa référence : 40 h/semaine (160 h/mois) ou 56 h/semaine (224 h/mois), également utilisée comme base des primes. Un dépassement hebdomadaire isolé ne suffit pas : les h.sup. ne sont payées que dans l’excédent mensuel au-delà de 160/224 h. Les taux restent inchangés.</p>
           <form id="r-form" class="form-grid">
             <div class="field"><label>🌙 Majoration nuit 22h→5h (%)</label>
               <input class="input" name="night_premium_pct" type="number" value="${R('night_premium_pct', 60)}" /></div>
@@ -140,8 +140,8 @@ export async function renderParametres(el, ctx) {
               <li>Travail de <b>22h à 5h</b> → majoration <b>60 %</b></li>
               <li>Travail le <b>dimanche</b> ou un <b>jour férié</b> → toutes les heures à <b>+60 %</b></li>
               <li><b>Dimanche/férié de nuit</b> (22h→5h) → majoration <b>100 %</b></li>
-              <li>Au-delà du seuil individuel de <b>40 h ou 56 h/semaine</b> : les <b>8 premières h.sup.</b> à <b>+15 %</b>, le reste à <b>+40 %</b></li>
-              <li><b>40 h.sup./mois</b> maximum à +15 %, le reste à <b>+40 %</b></li>
+              <li>Les h.sup. candidates dépassent <b>40 h ou 56 h/semaine</b>, mais ne sont payées que pour l’excédent mensuel au-delà de <b>160 ou 224 h</b> ; sous ou à la référence, aucune h.sup. n’est payée</li>
+              <li>Parmi les h.sup. payables : les <b>8 premières par semaine</b> à <b>+15 %</b>, puis <b>+40 %</b> ; quota de <b>40 h/mois</b> à +15 %</li>
               <li><b>Panier</b> si la journée atteint <b>10 h</b> ou comporte des heures de <b>nuit</b> — simple compteur (1, 2, 3…)</li>
               <li>Chaque <b>jour férié</b> non travaillé est payé <b>8 h</b></li>
             </ul>

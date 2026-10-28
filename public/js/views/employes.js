@@ -193,7 +193,7 @@ export async function renderEmployes(el, ctx) {
             </div>
             <div class="card pad" style="background:var(--gray-50)">
               <div class="stat-line"><span class="lbl">Salaire de base mensuel</span><span class="val">${fcfa(e.base_salary)}</span></div>
-              <p class="tiny muted mt-2">Les heures supplémentaires et majorations sont calculées sur ce salaire, selon la référence individuelle de ${e.weekly_hours} h/semaine (${e.weekly_hours * 4} h/mois).</p>
+              <p class="tiny muted mt-2">Les h.sup. payables sont limitées à l’excédent mensuel au-delà de ${e.weekly_hours * 4} h (après le seuil hebdomadaire de ${e.weekly_hours} h). Les autres majorations suivent la référence individuelle.</p>
               <div class="stat-line"><span class="lbl">Durée de référence</span><span class="val">${e.weekly_hours} h/semaine · ${e.weekly_hours * 4} h/mois</span></div>
               <div class="stat-line"><span class="lbl">Horaires</span><span class="val">${esc(e.schedule_name)} · ${esc(e.schedule_start)}–${esc(e.schedule_end)}</span></div>
               <div class="stat-line"><span class="lbl">Téléphone</span><span class="val">${esc(e.phone || '—')}</span></div>
