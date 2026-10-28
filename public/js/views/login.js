@@ -38,7 +38,7 @@ export function renderLogin(el, onLogin, { initialTab = 'login' } = {}) {
           </div>
           <div class="hero-feature">
             <div class="hf-ico">${icons.money}</div>
-            <div><b>Moteur de paie conforme</b><span>H.sup. +15 % / +40 % · Nuit +60 % · Dimanche/férié +60 % · Nuit fériée +100 %, calculés directement sur le salaire de base mensuel (base 40 h/semaine)</span></div>
+            <div><b>Moteur de paie conforme</b><span>H.sup. +15 % / +40 % · Nuit +60 % · Dimanche/férié +60 % · Nuit fériée +100 %, avec référence individuelle de 40 h ou 56 h par semaine</span></div>
           </div>
           <div class="hero-feature">
             <div class="hf-ico">${icons.shield}</div>

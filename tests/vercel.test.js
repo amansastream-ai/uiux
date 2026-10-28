@@ -171,3 +171,81 @@ test('Création de compte : rôle Pointeur, entreprise facultative et session st
   });
   assert.equal(duplicate.status, 409);
 });
+
+test('Migration et données de démo : références 40/56 h et quota mensuel de 40 h', () => {
+  const inst = createTempDb('weekly-seed');
+  const dayEmployees = inst.db.prepare('SELECT COUNT(*) AS n FROM employees WHERE weekly_hours = 40').get().n;
+  const longWeekEmployees = inst.db.prepare('SELECT COUNT(*) AS n FROM employees WHERE weekly_hours = 56').get().n;
+  const quota = inst.db.prepare("SELECT value FROM pay_rules WHERE key = 'ot_month_quota_hours'").get();
+  assert.equal(dayEmployees, 8);
+  assert.equal(longWeekEmployees, 4);
+  assert.equal(quota.value, '40');
+  inst.db.close();
+
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'chronorh-test-old-schema-'));
+  const legacy = open(path.join(dir, 'chronorh.db'));
+  legacy.exec("CREATE TABLE employees (id INTEGER PRIMARY KEY, schedule_name TEXT); INSERT INTO employees(schedule_name) VALUES ('Jour'), ('Nuit'), ('Rotation 7j/7')");
+  legacy.exec('CREATE TABLE payroll_items (id INTEGER PRIMARY KEY, base_salary INTEGER NOT NULL)');
+  schema(legacy);
+  assert.deepEqual(legacy.prepare('SELECT weekly_hours FROM employees ORDER BY id').all().map((row) => row.weekly_hours), [40, 56, 56]);
+  assert.ok(legacy.prepare('PRAGMA table_info(payroll_items)').all().some((column) => column.name === 'weekly_hours'));
+  legacy.close();
+});
+
+test('Employé : la référence de 40/56 h est validée et enregistrée par salarié', async () => {
+  const inst = createTempDb('employee-weekly');
+  const app = appModule.createApp(inst.db);
+  const login = await requestHandler(app, {
+    method: 'POST',
+    url: '/api/auth/login',
+    body: { email: 'admin@sahelservices.sn', password: 'demo2026' }
+  });
+  assert.equal(login.status, 200);
+  const cookie = login.setCookie.split(';')[0];
+
+  const created = await requestHandler(app, {
+    method: 'POST',
+    url: '/api/employees',
+    cookie,
+    body: {
+      matricule: 'EMP-TEST', first_name: 'Test', last_name: 'Référence',
+      base_salary: 200000, schedule_name: 'Flexible', weekly_hours: '56'
+    }
+  });
+  assert.equal(created.status, 201);
+  assert.equal(created.json.employee.weekly_hours, 56);
+  assert.equal(created.json.employee.schedule_name, 'Flexible');
+
+  const invalid = await requestHandler(app, {
+    method: 'PUT',
+    url: `/api/employees/${created.json.employee.id}`,
+    cookie,
+    body: { ...created.json.employee, weekly_hours: '48' }
+  });
+  assert.equal(invalid.status, 400);
+
+  const updated = await requestHandler(app, {
+    method: 'PUT',
+    url: `/api/employees/${created.json.employee.id}`,
+    cookie,
+    body: { ...created.json.employee, weekly_hours: '40' }
+  });
+  assert.equal(updated.status, 200);
+  assert.equal(updated.json.employee.weekly_hours, 40);
+
+  const generated = await requestHandler(app, {
+    method: 'POST',
+    url: '/api/payroll/runs',
+    cookie,
+    body: { period: '2026-10' }
+  });
+  assert.equal(generated.status, 201);
+  const run = await requestHandler(app, {
+    url: `/api/payroll/runs/${generated.json.run_id}`,
+    cookie
+  });
+  assert.equal(run.status, 200);
+  assert.equal(run.json.items.find((item) => item.matricule === 'EMP-001').weekly_hours, 40);
+  assert.equal(run.json.items.find((item) => item.matricule === 'EMP-009').weekly_hours, 56);
+  inst.db.close();
+});

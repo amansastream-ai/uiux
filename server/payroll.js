@@ -7,13 +7,11 @@
  *  1. Nuit (22h → 5h du matin) ..................... majoration 60 %
  *  2. Dimanche & jour férié (heures travaillées) .... majoration 60 %
  *  3. Dimanche / jour férié de nuit (22h → 5h) ...... majoration 100 %
- *  4. Semaine de 40 h : heures sup. au-delà de 40h :
- *        les 8 premières heures ..................... majoration 15 %
- *        le reste .................................. majoration 40 %
- *  5. Quota mensuel d'heures sup. : au plus 32 h.sup. par mois peuvent être
- *     majorées à 15 % (= 4 semaines × 8 h) ; le reste .... majoration 40 %
- *     (concrètement : +15 % si (parmi les 8 premières h.sup. de la semaine)
- *                      ET (dans le quota de 32 h.sup. à 15 % du mois), sinon +40 %)
+ *  4. Seuil hebdomadaire propre à chaque employé (40 h ou 56 h) :
+ *        les 8 premières heures supplémentaires ........ majoration 15 %
+ *        le reste ...................................... majoration 40 %
+ *  5. Quota mensuel : au plus 40 h.sup. peuvent bénéficier de +15 % ; le reste
+ *     est majoré à 40 %.
  *  6. Panier repas si la journée atteint 10 h de travail, OU contient
  *     des heures de nuit. Le panier est un COMPTEUR (1, 2, 3…) — il n'est
  *     jamais converti en francs CFA.
@@ -33,10 +31,10 @@ const DEFAULT_RULES = {
   premium_stacking: 'add',        // 'add' = cumul, 'max' = majoration la plus forte seule
 
   // --- Heures supplémentaires ---
-  week_base_hours: 40,            // règle 4 : seuil hebdomadaire
+  week_base_hours: 40,            // seuil de repli si aucune référence salarié n'est fournie
   ot_week_first_hours: 8,         // règle 4 : les 8 premières h.sup. de la semaine
   ot_week_first_pct: 15,          // règle 4 : à 15 %
-  ot_month_quota_hours: 32,       // règle 5 : quota mensuel éligible à 15 %
+  ot_month_quota_hours: 40,       // règle 5 : quota mensuel éligible à 15 %
   ot_rest_pct: 40,                // règles 4 & 5 : le reste à 40 %
 
   // --- Panier ---
@@ -128,6 +126,11 @@ function computePayroll(opts) {
   const sessions = (opts.sessions || [])
     .map((s) => ({ start: s.start, end: s.end }))
     .sort((a, b) => new Date(a.start) - new Date(b.start));
+  const requestedWeeklyHours = Number(opts.weeklyHours);
+  const weeklyBaseHours = Number.isFinite(requestedWeeklyHours) && requestedWeeklyHours > 0
+    ? requestedWeeklyHours
+    : Number(rules.week_base_hours) || 40;
+  const monthlyBaseHours = weeklyBaseHours * 4;
 
   // ---- 1. Classification des minutes + journal par jour ----
   const totals = { base: 0, night: 0, restDay: 0, restNight: 0 };
@@ -162,7 +165,7 @@ function computePayroll(opts) {
 
   const totalMinutes = totals.base + totals.night + totals.restDay + totals.restNight;
 
-  // ---- 2. Heures supplémentaires (hebdo 40h + quota mensuel 32h) ----
+  // ---- 2. Heures supplémentaires (seuil hebdomadaire salarié + quota mensuel 40h) ----
   // Toutes les minutes (tous seaux confondus) comptent dans la durée du travail.
   // Chronologie des minutes dépassant le seuil hebdomadaire :
   const otEvents = []; // {ts, week}
@@ -179,11 +182,11 @@ function computePayroll(opts) {
     }
   }
   // Compte hebdo progressif dans l'ordre chronologique.
-  // Quota mensuel : il plafonne les heures éligibles au taux 15 %
-  // (32 h = 4 semaines × 8 h). Au-delà, tout passe à 40 %.
+  // Quota mensuel : 40 h maximum sont éligibles à la majoration de 15 %.
+  // Les heures supplémentaires restantes passent à 40 %.
   const weekSeen = new Map();
   let ot15 = 0, ot40 = 0, monthOt15 = 0;
-  const weekThreshold = rules.week_base_hours * 60;
+  const weekThreshold = weeklyBaseHours * 60;
   const weekFirst = rules.ot_week_first_hours * 60;
   const monthQuota = rules.ot_month_quota_hours * 60;
   for (const ev of otEvents) {
@@ -220,12 +223,11 @@ function computePayroll(opts) {
 
   // ---- 5. Montants (FCFA) ----
   const money = (x) => Math.round(x); // FCFA entier
-  const monthlyBaseHours = 40 * 52 / 12;
   const minutesAsHours = (m) => m / 60;
   const premiumAmount = (hours, pct) => money(opts.baseSalary * hours / monthlyBaseHours * pct / 100);
 
   // Toutes les primes sont calculées directement sur le salaire de base mensuel,
-  // ramené à une base de 40 h/semaine (40 × 52 ÷ 12 heures mensuelles).
+  // rapporté à la durée mensuelle de référence de l'employé (4 semaines).
   const nightMinutes = totals.night;
   const restDayMinutes = totals.restDay;
   const restNightMinutes = totals.restNight;
@@ -255,7 +257,7 @@ function computePayroll(opts) {
       quantity: Math.round(ot15Hours * 100) / 100, unit: 'h',
       premium_pct: 15,
       amount: premiumAmount(ot15Hours, 15),
-      note: '8 premières h.sup. de la semaine (dans le quota de 32 h/mois)'
+      note: '8 premières h.sup. de la semaine (dans le quota de 40 h/mois)'
     });
   }
   if (ot40 > 0) {
@@ -264,7 +266,7 @@ function computePayroll(opts) {
       quantity: Math.round(ot40Hours * 100) / 100, unit: 'h',
       premium_pct: 40,
       amount: premiumAmount(ot40Hours, 40),
-      note: 'Au-delà de 8 h.sup./semaine ou 32 h.sup./mois'
+      note: 'Au-delà de 8 h.sup./semaine ou du quota de 40 h.sup./mois'
     });
   }
 

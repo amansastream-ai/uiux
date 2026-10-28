@@ -91,6 +91,7 @@ function schema(db) {
     contract_type TEXT DEFAULT 'CDI',
     hire_date TEXT,
     base_salary INTEGER NOT NULL DEFAULT 0,
+    weekly_hours INTEGER NOT NULL DEFAULT 40,
     schedule_name TEXT DEFAULT 'Jour',
     schedule_start TEXT DEFAULT '08:00',
     schedule_end TEXT DEFAULT '17:00',
@@ -135,6 +136,7 @@ function schema(db) {
     run_id INTEGER NOT NULL REFERENCES payroll_runs(id),
     employee_id INTEGER NOT NULL REFERENCES employees(id),
     base_salary INTEGER NOT NULL,
+    weekly_hours INTEGER NOT NULL DEFAULT 40,
     hours_json TEXT,
     lines_json TEXT,
     gross INTEGER NOT NULL,
@@ -165,12 +167,29 @@ function schema(db) {
     expires_at TEXT NOT NULL
   );
   `);
+
+  const employeeColumns = db.prepare('PRAGMA table_info(employees)').all();
+  if (!employeeColumns.some((column) => column.name === 'weekly_hours')) {
+    db.exec('ALTER TABLE employees ADD COLUMN weekly_hours INTEGER NOT NULL DEFAULT 40');
+    db.exec("UPDATE employees SET weekly_hours = 56 WHERE schedule_name IN ('Nuit', 'Rotation 7j/7')");
+  }
+
+  const payrollItemColumns = db.prepare('PRAGMA table_info(payroll_items)').all();
+  if (!payrollItemColumns.some((column) => column.name === 'weekly_hours')) {
+    db.exec('ALTER TABLE payroll_items ADD COLUMN weekly_hours INTEGER NOT NULL DEFAULT 40');
+  }
 }
 
 function seed(db) {
   const userCount = db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
   const empCount = db.prepare('SELECT COUNT(*) AS n FROM employees').get().n;
-  if (userCount >= 4 && empCount >= 12) return false;
+  if (userCount >= 4 && empCount >= 12) {
+    const quota = db.prepare("SELECT value FROM pay_rules WHERE key = 'ot_month_quota_hours'").get();
+    if (!quota || Number(quota.value) === 32) {
+      db.prepare("INSERT OR REPLACE INTO pay_rules(key, value) VALUES ('ot_month_quota_hours', '40')").run();
+    }
+    return false;
+  }
 
   db.exec('BEGIN');
   try {
@@ -212,8 +231,8 @@ function seed(db) {
   // ---------- Employés ----------
   const emp = db.prepare(`INSERT INTO employees
     (matricule, first_name, last_name, email, phone, department_id, position, contract_type, hire_date,
-     base_salary, schedule_name, schedule_start, schedule_end, qr_token, fingerprint_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+     base_salary, weekly_hours, schedule_name, schedule_start, schedule_end, qr_token, fingerprint_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 
   const employees = [
     ['EMP-001', 'Cheikh', 'Diop', 'cheikh.diop@sahelservices.sn', '77 312 44 10', 1, 'Assistant administratif', 'CDI', '2021-02-15', 285000, 'Jour', '08:00', '17:00'],
@@ -234,7 +253,8 @@ function seed(db) {
     const digest = crypto.createHash('sha256').update(`chronorh-demo-${e[0]}`).digest('hex').toUpperCase();
     const qr = 'QR-' + digest.slice(0, 12);
     const fp = 'FP-' + digest.slice(12, 28);
-    emp.run(e[0], e[1], e[2], e[3], e[4], e[5], e[6], e[7], e[8], e[9], e[10], e[11], e[12], qr, fp);
+    const weeklyHours = ['Nuit', 'Rotation 7j/7'].includes(e[10]) ? 56 : 40;
+    emp.run(e[0], e[1], e[2], e[3], e[4], e[5], e[6], e[7], e[8], e[9], weeklyHours, e[10], e[11], e[12], qr, fp);
     fpSeq++;
   }
 

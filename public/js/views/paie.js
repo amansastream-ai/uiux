@@ -14,7 +14,7 @@ export async function renderPaie(el, ctx) {
     <div class="page-head">
       <div>
         <h2>Paie &amp; salaires</h2>
-        <div class="sub">H.sup. (+15 % / +40 %) et majorations (nuit +60 %, dimanche/férié +60 %, nuit fériée +100 %) calculées directement sur le salaire de base mensuel — base 40 h/semaine.</div>
+        <div class="sub">Les seuils et la base mensuelle des primes suivent la référence de chaque salarié : 40 h/semaine (160 h/mois) ou 56 h/semaine (224 h/mois). Quota mensuel d’h.sup. à +15 % : 40 h.</div>
       </div>
       <div class="actions">
         <input class="input" type="month" id="pay-period" value="${period}" style="width:170px" />
@@ -31,12 +31,12 @@ export async function renderPaie(el, ctx) {
             <span class="rule-chip" style="background:rgba(255,255,255,.1);color:#DCE6F2">🌙 Nuit 22h→5h <b style="color:#C9C2F8">+60 %</b></span>
             <span class="rule-chip" style="background:rgba(255,255,255,.1);color:#DCE6F2">☀️ Dimanche / férié <b style="color:#F6D78A">+60 %</b></span>
             <span class="rule-chip" style="background:rgba(255,255,255,.1);color:#DCE6F2">🌌 Nuit dimanche/férié <b style="color:#F6D78A">+100 %</b></span>
-            <span class="rule-chip" style="background:rgba(255,255,255,.1);color:#DCE6F2">⏱️ H.sup. &gt; 40 h/sem. <b style="color:#8FD8BC">8 h à +15 %</b> puis <b style="color:#8FD8BC">+40 %</b></span>
-            <span class="rule-chip" style="background:rgba(255,255,255,.1);color:#DCE6F2">📅 Quota 32 h.sup./mois à +15 %</span>
+            <span class="rule-chip" style="background:rgba(255,255,255,.1);color:#DCE6F2">⏱️ Seuil individuel 40/56 h/sem. · <b style="color:#8FD8BC">8 h à +15 %</b> puis <b style="color:#8FD8BC">+40 %</b></span>
+            <span class="rule-chip" style="background:rgba(255,255,255,.1);color:#DCE6F2">📅 Quota 40 h.sup./mois à +15 %</span>
             <span class="rule-chip" style="background:rgba(255,255,255,.1);color:#DCE6F2">🧺 Panier si ≥ 10 h ou nuit — <b style="color:#8FD8BC">compteur 1, 2, 3…</b></span>
             <span class="rule-chip" style="background:rgba(255,255,255,.1);color:#DCE6F2">🎉 Jour férié non travaillé = <b style="color:#F6D78A">8 h payées</b></span>
           </div>
-          <div class="tiny mt-2" style="color:#C8D5E4">Toutes les primes sont calculées directement sur le salaire de base mensuel (base 40 h/semaine).</div>
+          <div class="tiny mt-2" style="color:#C8D5E4">Les primes sont calculées sur le salaire de base mensuel avec la référence individuelle de 160 ou 224 h/mois ; les taux restent inchangés.</div>
         </div>
         <div style="text-align:right">
           <div class="tiny" style="color:#9FB0C6">Période sélectionnée</div>
@@ -139,7 +139,7 @@ export async function renderPaie(el, ctx) {
         <tbody>
           ${results.map((r, i) => `
             <tr class="breakdown-row" data-i="${i}">
-              <td>${personCell(r.employee.first_name, r.employee.last_name, r.employee.matricule + ' · ' + (r.employee.department || ''))}</td>
+              <td>${personCell(r.employee.first_name, r.employee.last_name, r.employee.matricule + ' · ' + (r.employee.department || '') + ' · ' + r.employee.weekly_hours + ' h/sem. · ' + r.employee.monthly_hours + ' h/mois')}</td>
               <td class="num b">${num(r.hours.total)}</td>
               <td class="num">${r.hours.night ? `<span style="color:var(--color-night);font-weight:700">${num(r.hours.night)}</span>` : '—'}</td>
               <td class="num">${(r.hours.rest_day + r.hours.rest_night) ? `<span style="color:var(--gold-600);font-weight:700">${num(r.hours.rest_day + r.hours.rest_night)}</span>` : '—'}</td>
@@ -152,7 +152,7 @@ export async function renderPaie(el, ctx) {
             </tr>`).join('')}
         </tbody>
       </table></div>
-      <div class="tiny muted mt-4" style="padding:0 16px 12px">Cliquez sur une ligne pour voir le détail. Les h.sup. (+15 % / +40 %) et majorations nuit (+60 %), dimanche/férié (+60 %), nuit fériée (+100 %) partent du salaire de base mensuel (base 40 h/semaine).</div>`
+      <div class="tiny muted mt-4" style="padding:0 16px 12px">Cliquez sur une ligne pour voir le détail. Le seuil et la base mensuelle de chaque prime correspondent aux heures de référence indiquées pour le salarié.</div>`
       : emptyState('users', 'Aucun employé actif');
 
     el.querySelectorAll('.breakdown-row').forEach((row) => row.addEventListener('click', (e) => {
@@ -174,7 +174,7 @@ export async function renderPaie(el, ctx) {
       <div class="grid cols-2">
         <div>
           <div class="b mb-2">Lignes de paie</div>
-          <div class="tiny muted mb-2">Calcul sur le salaire de base mensuel, base 40 h/semaine ; les h.sup. et majorations affichées appliquent le pourcentage correspondant à cette base.</div>
+          <div class="tiny muted mb-2">Calcul sur le salaire de base mensuel, base ${r.employee.monthly_hours} h/mois (${r.employee.weekly_hours} h/semaine) ; les pourcentages de majoration restent inchangés.</div>
           <div class="payslip">
             <table>
               ${r.lines.map((l) => `
@@ -242,7 +242,7 @@ export async function renderPaie(el, ctx) {
             <div style="text-align:right">
               <div class="tiny muted">Salaire de base mensuel</div>
               <div class="b">${fcfa(r.employee.base_salary)}</div>
-              <div class="tiny muted">Calcul des h.sup. et majorations sur le salaire mensuel — base 40 h/semaine.</div>
+              <div class="tiny muted">Référence : ${r.employee.weekly_hours} h/semaine · ${r.employee.monthly_hours} h/mois. Les taux de majoration restent inchangés.</div>
             </div>
           </div>
           <table>
@@ -259,7 +259,7 @@ export async function renderPaie(el, ctx) {
           <div class="tiny muted mt-4">
             Heures : ${num(r.hours.total)} h au total — nuit ${num(r.hours.night)} h · dimanche/férié ${num(r.hours.rest_day + r.hours.rest_night)} h ·
             h.sup. ${num(r.hours.overtime_15 + r.hours.overtime_40)} h · paniers : ${r.paniers.count}.<br/>
-            Majorations appliquées sur le salaire de base mensuel (base 40 h/semaine) : nuit +60 %, dimanche/férié +60 %, nuit fériée +100 %, h.sup. +15 % puis +40 %.
+            Référence individuelle : ${r.employee.weekly_hours} h/semaine (${r.employee.monthly_hours} h/mois). Majorations inchangées : nuit +60 %, dimanche/férié +60 %, nuit fériée +100 %, h.sup. +15 % puis +40 % ; quota mensuel h.sup. à +15 % : 40 h.
           </div>
         </div>`,
       footer: `<button class="btn outline" data-close>Fermer</button>
@@ -305,7 +305,7 @@ export async function renderPaie(el, ctx) {
           <thead><tr><th>Employé</th><th class="num">Heures</th><th class="num">Brut</th><th class="num">Net</th><th>Statut</th></tr></thead>
           <tbody>${data.items.map((i) => `
             <tr>
-              <td>${personCell(i.first_name, i.last_name, i.matricule)}</td>
+              <td>${personCell(i.first_name, i.last_name, i.matricule + ' · ' + i.weekly_hours + ' h/sem. · ' + (i.weekly_hours * 4) + ' h/mois')}</td>
               <td class="num">${num(JSON.parse(i.hours_json || '{}').total || 0)}</td>
               <td class="num">${fcfa(i.gross)}</td>
               <td class="num b">${fcfa(i.net)}</td>

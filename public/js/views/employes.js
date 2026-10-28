@@ -15,7 +15,7 @@ export async function renderEmployes(el, ctx) {
     <div class="page-head">
       <div>
         <h2>Employés &amp; badges</h2>
-        <div class="sub">${employees.length} employé(s) — salaire de base mensuel servant au calcul direct des h.sup. et majorations (base 40 h/semaine)</div>
+        <div class="sub">${employees.length} employé(s) — référence de 40 h/semaine (160 h/mois) ou 56 h/semaine (224 h/mois), définie par salarié</div>
       </div>
       <div class="actions">
         <div class="search-box" style="width:260px">
@@ -31,7 +31,7 @@ export async function renderEmployes(el, ctx) {
           <thead>
             <tr>
               <th>Employé</th><th>Matricule</th><th>Département</th><th>Poste</th>
-              <th>Horaires</th><th class="num">Salaire de base</th><th>Badge</th><th>Statut</th><th></th>
+              <th>Horaires</th><th>Référence</th><th class="num">Salaire de base</th><th>Badge</th><th>Statut</th><th></th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -49,6 +49,7 @@ export async function renderEmployes(el, ctx) {
         <td>${esc(e.department || '—')}</td>
         <td>${esc(e.position || '—')}</td>
         <td class="small">${esc(e.schedule_name)} · ${esc(e.schedule_start)}–${esc(e.schedule_end)}</td>
+        <td class="small"><b>${e.weekly_hours} h/sem.</b><br/><span class="muted">${e.weekly_hours * 4} h/mois</span></td>
         <td class="num b">${fcfa(e.base_salary)}</td>
         <td>
           ${badge('blue', 'QR')} ${e.fingerprint_id ? badge('violet', 'Empreinte') : badge('gray', 'Sans empreinte')}
@@ -60,7 +61,7 @@ export async function renderEmployes(el, ctx) {
             <button class="btn-icon danger" title="Désactiver" data-del="${e.id}">${icons.trash}</button>
           </div>
         </td>
-      </tr>`).join('') : `<tr><td colspan="9">${emptyState('users', 'Aucun employé trouvé')}</td></tr>`;
+      </tr>`).join('') : `<tr><td colspan="10">${emptyState('users', 'Aucun employé trouvé')}</td></tr>`;
 
     tbody.querySelectorAll('[data-open]').forEach((r) =>
       r.addEventListener('click', (ev) => {
@@ -120,6 +121,11 @@ export async function renderEmployes(el, ctx) {
             <input class="input" type="date" name="hire_date" value="${esc(emp?.hire_date || '')}" /></div>
           <div class="field"><label>Salaire de base mensuel (FCFA) *</label>
             <input class="input" type="number" name="base_salary" required min="0" step="5000" value="${emp?.base_salary || 200000}" /></div>
+          <div class="field"><label>Durée de référence *</label>
+            <select class="input" name="weekly_hours" required>
+              <option value="40" ${!emp || Number(emp.weekly_hours) === 40 ? 'selected' : ''}>40 h/semaine · 160 h/mois</option>
+              <option value="56" ${emp && Number(emp.weekly_hours) === 56 ? 'selected' : ''}>56 h/semaine · 224 h/mois</option>
+            </select></div>
           <div class="field"><label>Horaires</label>
             <select class="input" name="schedule_name">
               ${['Jour', 'Équipe jour', 'Nuit', 'Rotation 7j/7', 'Flexible'].map((c) =>
@@ -187,7 +193,8 @@ export async function renderEmployes(el, ctx) {
             </div>
             <div class="card pad" style="background:var(--gray-50)">
               <div class="stat-line"><span class="lbl">Salaire de base mensuel</span><span class="val">${fcfa(e.base_salary)}</span></div>
-              <p class="tiny muted mt-2">Les heures supplémentaires (+15 % / +40 %) et majorations (nuit +60 %, dimanche/férié +60 %, nuit fériée +100 %) sont calculées directement sur ce salaire — base 40 h/semaine.</p>
+              <p class="tiny muted mt-2">Les heures supplémentaires et majorations sont calculées sur ce salaire, selon la référence individuelle de ${e.weekly_hours} h/semaine (${e.weekly_hours * 4} h/mois).</p>
+              <div class="stat-line"><span class="lbl">Durée de référence</span><span class="val">${e.weekly_hours} h/semaine · ${e.weekly_hours * 4} h/mois</span></div>
               <div class="stat-line"><span class="lbl">Horaires</span><span class="val">${esc(e.schedule_name)} · ${esc(e.schedule_start)}–${esc(e.schedule_end)}</span></div>
               <div class="stat-line"><span class="lbl">Téléphone</span><span class="val">${esc(e.phone || '—')}</span></div>
               <div class="stat-line"><span class="lbl">E-mail</span><span class="val small">${esc(e.email || '—')}</span></div>
