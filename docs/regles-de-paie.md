@@ -52,13 +52,19 @@ horaire de cette référence, puis ajoutées au salaire mensuel.
 
 ## 3. Heures supplémentaires
 
-1. **Seuil hebdomadaire individuel** : au-delà de la référence de l'employé
-   (**40 h** ou **56 h** du lundi au dimanche)
-   - les **8 premières heures supplémentaires de la semaine** → **+15 %**
-   - **le reste** → **+40 %**
-2. **Quota mensuel** : au plus **40 heures supplémentaires par mois** peuvent
-   bénéficier de la majoration de 15 %. Toute heure supplémentaire au-delà du
-   quota → **+40 %**.
+1. **Seuil hebdomadaire individuel** : les heures au-delà de la référence de
+   l'employé (**40 h** ou **56 h** du lundi au dimanche) sont candidates aux
+   heures supplémentaires.
+2. **Plafond mensuel payable** : seules les heures candidates comprises dans
+   l'excédent du total mensuel au-delà de la référence sont payées :
+   `min(h.sup. candidates hebdomadaires, max(0, total mensuel − référence mensuelle))`.
+   La référence mensuelle est de **160 h** (salarié à 40 h/semaine) ou **224 h**
+   (salarié à 56 h/semaine). Ainsi, aucune h.sup. n'est payée lorsque le total
+   mensuel est **inférieur ou égal** à cette référence, même si une semaine
+   isolée dépasse le seuil hebdomadaire.
+3. **Taux et quota** : parmi les heures supplémentaires payables, les **8
+   premières de chaque semaine** sont à **+15 %**; au plus **40 h par mois**
+   peuvent recevoir ce taux. Les autres heures payables sont à **+40 %**.
 
 **Cumul** : une heure supplémentaire de nuit peut recevoir les deux majorations :
 `+60 % (nuit) + 40 % (heures sup.) = +100 %` de prime sur la base mensuelle.
@@ -95,11 +101,14 @@ converti en francs CFA** et n'entre pas dans le brut.
 ## 7. Exemple complet
 
 Pour un salaire de base mensuel de **275 000 FCFA** et une référence de
-**40 h/semaine**, la base de calcul mensuelle est `40 × 4 = 160 h`. Une semaine
-avec 45 h comprend 5 h supplémentaires dans la tranche à **+15 %**. Avec une
-référence de 56 h, le calcul mensuel utilise `56 × 4 = 224 h` et les heures
-supplémentaires commencent au-delà de 56 h par semaine. Les primes et le crédit
-d'un férié non travaillé de **8 h** utilisent la même base individuelle.
+**40 h/semaine**, la base mensuelle est `40 × 4 = 160 h`. Une semaine à 45 h
+crée 5 h.sup. candidates, mais elles ne sont pas payées si le total du mois
+n'excède pas 160 h. Si le mois atteint 165 h et contient au moins ces 5 h
+candidates, elles sont payées à **+15 %**. La même règle s'applique à la
+référence de **56 h/semaine** : `56 × 4 = 224 h`, et seules les h.sup. candidates
+comprises dans l'excédent mensuel au-delà de 224 h peuvent être payées. Les
+primes et le crédit d'un férié non travaillé de **8 h** utilisent la même base
+individuelle.
 
 Le panier reste un compteur. Le brut correspond au salaire mensuel de base,
 augmenté des primes et crédits applicables, puis les cotisations IPRES 5,6 % et

@@ -8,6 +8,20 @@ const rules = {};
 const none = [];
 const period = { periodFrom: '2026-10-01', periodTo: '2026-10-31' };
 
+function addWorkWeek(sessions, monday, dailyHours, { days = 5, startHour = 8 } = {}) {
+  const firstDay = new Date(`${monday}T12:00:00`);
+  const clock = (hour) => `${String(hour).padStart(2, '0')}:00:00`;
+  for (let offset = 0; offset < days; offset++) {
+    const date = new Date(firstDay);
+    date.setDate(date.getDate() + offset);
+    const dateIso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    sessions.push({
+      start: `${dateIso}T${clock(startHour)}`,
+      end: `${dateIso}T${clock(startHour + dailyHours)}`
+    });
+  }
+}
+
 test('règle 1 : la nuit 22h→5h est majorée à 60 %', () => {
   const r = computePayroll({
     baseSalary: 160000, // → 1000 FCFA/h
@@ -82,42 +96,78 @@ test('règle 3 : dimanche/férié de nuit 22h→5h → 100 %', () => {
   assert.equal(difn.amount, Math.round(2 * 1000 * 1.0));
 });
 
-test('règle 4 : au-delà de 40h/semaine — 8 h à +15 %, le reste à +40 %', () => {
-  // Semaine du lundi 5 au dimanche 11 octobre 2026 : 5 jours × 9h = 45h
+test('règle 4 : un dépassement hebdomadaire isolé sous 160 h/mois n’est pas payable', () => {
   const sessions = [];
-  for (let d = 5; d <= 9; d++) {
-    sessions.push({ start: `2026-10-0${d}T08:00:00`, end: `2026-10-0${d}T17:00:00` });
-  }
+  addWorkWeek(sessions, '2026-10-05', 9);
   const r = computePayroll({ baseSalary: 160000, sessions, holidays: none, rules: {}, ...period });
   assert.equal(r.hours.total, 45);
-  assert.equal(r.hours.overtime_15, 5); // 5 h.sup. seulement → toutes dans les 8 premières
+  assert.equal(r.hours.overtime_15, 0);
   assert.equal(r.hours.overtime_40, 0);
 });
 
-test('seuil hebdomadaire de 56 h : les heures sup. suivent la référence individuelle', () => {
+test('à 160 h/mois exactement, les dépassements hebdomadaires ne sont pas payés', () => {
   const sessions = [];
-  for (let d = 5; d <= 10; d++) {
-    sessions.push({ start: `2026-10-${String(d).padStart(2, '0')}T07:00:00`, end: `2026-10-${String(d).padStart(2, '0')}T17:00:00` });
-  }
+  addWorkWeek(sessions, '2026-10-05', 9); // 45 h : 5 h candidates
+  addWorkWeek(sessions, '2026-10-12', 8);
+  addWorkWeek(sessions, '2026-10-19', 8);
+  addWorkWeek(sessions, '2026-10-26', 7);
+  const r = computePayroll({ baseSalary: 160000, sessions, holidays: none, rules: {}, ...period });
+  assert.equal(r.hours.total, 160);
+  assert.equal(r.hours.overtime_15, 0);
+  assert.equal(r.hours.overtime_40, 0);
+});
+
+test('règle 4 : 5 h au-delà de 40 h/semaine sont payées après dépassement de 160 h/mois', () => {
+  const sessions = [];
+  addWorkWeek(sessions, '2026-10-05', 9); // 45 h : 5 h candidates
+  addWorkWeek(sessions, '2026-10-12', 8);
+  addWorkWeek(sessions, '2026-10-19', 8);
+  addWorkWeek(sessions, '2026-10-26', 8);
+  const r = computePayroll({ baseSalary: 160000, sessions, holidays: none, rules: {}, ...period });
+  assert.equal(r.hours.total, 165);
+  assert.equal(r.hours.overtime_15, 5);
+  assert.equal(r.hours.overtime_40, 0);
+});
+
+test('seuil hebdomadaire de 56 h : un dépassement isolé sous 224 h/mois n’est pas payable', () => {
+  const sessions = [];
+  addWorkWeek(sessions, '2026-10-05', 10, { days: 6, startHour: 7 });
   const r = computePayroll({
     baseSalary: 224000, weeklyHours: 56, rules: { week_base_hours: 40 },
     sessions, holidays: none, ...period
   });
   assert.equal(r.hours.total, 60);
-  assert.equal(r.hours.overtime_15, 4); // 60 h travaillées − seuil individuel de 56 h
+  assert.equal(r.hours.overtime_15, 0);
   assert.equal(r.hours.overtime_40, 0);
 });
 
-test('règle 4 bis : dépassement > 8h.sup./semaine → 40 %', () => {
-  // 6 jours × 10h = 60h dans la semaine du 5
+test('seuil hebdomadaire de 56 h : 4 h.sup. sont payées lorsque le total dépasse 224 h/mois', () => {
   const sessions = [];
-  for (let d = 5; d <= 10; d++) {
-    sessions.push({ start: `2026-10-${String(d).padStart(2, '0')}T07:00:00`, end: `2026-10-${String(d).padStart(2, '0')}T17:00:00` });
-  }
+  addWorkWeek(sessions, '2026-10-05', 8, { days: 7, startHour: 7 });
+  sessions.push({ start: '2026-10-05T15:00:00', end: '2026-10-05T19:00:00' }); // 60 h cette semaine
+  addWorkWeek(sessions, '2026-10-12', 8, { days: 7, startHour: 7 });
+  addWorkWeek(sessions, '2026-10-19', 8, { days: 7, startHour: 7 });
+  addWorkWeek(sessions, '2026-10-26', 8, { days: 7, startHour: 7 });
+  const r = computePayroll({
+    baseSalary: 224000, weeklyHours: 56, rules: { week_base_hours: 40 },
+    sessions, holidays: none, periodFrom: '2026-10-05', periodTo: '2026-11-01'
+  });
+  assert.equal(r.hours.total, 228);
+  assert.equal(r.hours.overtime_15, 4);
+  assert.equal(r.hours.overtime_40, 0);
+});
+
+test('règle 4 bis : au-delà de 8 h.sup./semaine, le reste passe à +40 %', () => {
+  const sessions = [];
+  addWorkWeek(sessions, '2026-10-05', 10); // 50 h
+  sessions.push({ start: '2026-10-10T08:00:00', end: '2026-10-10T18:00:00' }); // 60 h cette semaine
+  addWorkWeek(sessions, '2026-10-12', 8);
+  addWorkWeek(sessions, '2026-10-19', 8);
+  addWorkWeek(sessions, '2026-10-26', 8);
   const r = computePayroll({ baseSalary: 160000, sessions, holidays: none, rules: {}, ...period });
-  assert.equal(r.hours.total, 60);
+  assert.equal(r.hours.total, 180);
   assert.equal(r.hours.overtime_15, 8);
-  assert.equal(r.hours.overtime_40, 12); // 20h sup → 8 à 15%, 12 à 40%
+  assert.equal(r.hours.overtime_40, 12); // 20 h candidates/payables : 8 à 15 %, 12 à 40 %
 });
 
 test('règle 5 : quota mensuel de 40 h.sup. à 15 % — le reste à +40 %', () => {
